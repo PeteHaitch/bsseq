@@ -33,6 +33,7 @@ importFrom(data.table, "fread", "setnames")
 importFrom(R.utils, "isGzipped", "gunzip")
 import(limma)
 importFrom(permute, "shuffleSet", "how")
+importFrom(HDF5Array, "HDF5Array")
 
 ##
 ## Exporting
@@ -79,4 +80,7 @@ S3method("plot", "BSseqTstat")
 ## Fixes, to be removed
 
 exportMethods("assays", "assayNames")
+
+## HDF5Array kludges
+export("is.infinite")
 

@@ -64,5 +64,11 @@ BSmooth(BSseq, ns = 70, h = 1000, maxGap = 10^8,
 data(BS.chr22)
 BS.fit <- BSmooth(BS.chr22, verbose = TRUE)
 BS.fit
+
+# Using HDF5Array
+library(HDF5Array)
+assays(BS.chr22) <- endoapply(assays(BS.chr22), HDF5Array)
+BS.fit <- BSmooth(BS.chr22, verbose = TRUE, hdf5 = TRUE)
+BS.fit
 }
 }

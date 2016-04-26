@@ -75,8 +75,12 @@ combineList <- function(x, ...) {
         identical(gr, getBSseq(xx, "gr"))
     })
     if(all(sameGr)) {
-        M <- do.call(cbind, lapply(x, function(xx) getBSseq(xx, "M")))
-        Cov <- do.call(cbind, lapply(x, function(xx) getBSseq(xx, "Cov")))
+        # TODO: Errors on list of DelayedMatrix objects (coming from
+        #       read.bismark). Remove unname() once fixed.
+        M <- do.call(cbind, unname(lapply(x, function(xx) getBSseq(xx, "M"))))
+        # TODO: Errors on list of DelayedMatrix objects (coming from
+        #       read.bismark). Remove unname9) once fixed
+        Cov <- do.call(cbind, unname(lapply(x, function(xx) getBSseq(xx, "Cov"))))
     } else {
         gr <- sort(reduce(do.call(c, unname(lapply(x, granges))), min.gapwidth = 0L))
         sampleNames <- do.call(c, unname(lapply(x, sampleNames)))

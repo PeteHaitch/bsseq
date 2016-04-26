@@ -1,10 +1,13 @@
+# TOOD: Should hdf5 be the default? Should it guess/recommend the user switch
+#       to hdf5 if they have large/many files?
 read.bismark <- function(files,
                          sampleNames,
                          rmZeroCov = FALSE,
                          strandCollapse = TRUE,
                          fileType = c("cov", "oldBedGraph", "cytosineReport"),
                          mc.cores = 1,
-                         verbose = TRUE) {
+                         verbose = TRUE,
+                         hdf5 = FALSE) {
     ## Argument checking
     if (anyDuplicated(files)) {
         stop("duplicate entries in 'files'")
@@ -35,12 +38,14 @@ read.bismark <- function(files,
         if (fileType == "cov" || fileType == "oldBedGraph") {
             out <- read.bismarkCovRaw(thisfile = files[ii],
                                       thisSampleName = sampleNames[ii],
-                                      rmZeroCov = rmZeroCov)
+                                      rmZeroCov = rmZeroCov,
+                                      hdf5 = hdf5)
         } else if (fileType == "cytosineReport") {
             out <- read.bismarkCytosineReportRaw(thisfile = files[ii],
                                                  thisSampleName = sampleNames[ii],
                                                  rmZeroCov = rmZeroCov,
-                                                 keepContext = FALSE)
+                                                 keepContext = FALSE,
+                                                 hdf5 = hdf5)
         }
         if (strandCollapse) {
             out <- strandCollapse(out)
@@ -66,9 +71,11 @@ read.bismark <- function(files,
     allOut
 }
 
+# TOOD: Should hdf5 be the default?
 read.bismarkCovRaw <- function(thisfile,
                                thisSampleName,
-                               rmZeroCov) {
+                               rmZeroCov,
+                               hdf5 = FALSE) {
 
     ## data.table::fread() can't read directly from a gzipped file so, if
     ## necessary, gunzip the file to a temporary location.
@@ -90,17 +97,28 @@ read.bismarkCovRaw <- function(thisfile,
                   ranges = IRanges(start = out[[2L]], width = 1L))
 
     ## Create BSseq instance from 'out'
-    BSseq(gr = gr,
-          M = as.matrix(out[[5L]]),
-          Cov = as.matrix(out[[5L]] + out[[6L]]),
-          sampleNames = thisSampleName,
-          rmZeroCov = rmZeroCov)
+    if (hdf5) {
+        bsseq <- BSseq(gr = gr,
+                       M = HDF5Array(as.matrix(out[[5L]])),
+                       Cov = HDF5Array(as.matrix(out[[5L]] + out[[6L]])),
+                       sampleNames = thisSampleName,
+                       rmZeroCov = rmZeroCov)
+    } else {
+        bsseq <- BSseq(gr = gr,
+                       M = as.matrix(out[[5L]]),
+                       Cov = as.matrix(out[[5L]] + out[[6L]]),
+                       sampleNames = thisSampleName,
+                       rmZeroCov = rmZeroCov)
+    }
+    bsseq
 }
 
+# TOOD: Should hdf5 be the default?
 read.bismarkCytosineReportRaw <- function(thisfile,
                                           thisSampleName,
                                           rmZeroCov,
-                                          keepContext = FALSE) {
+                                          keepContext = FALSE,
+                                          hdf5 = FALSE) {
 
     ## NOTE: keepContext not yet implemented
     if (keepContext) {
@@ -128,8 +146,17 @@ read.bismarkCytosineReportRaw <- function(thisfile,
                   strand = out[[3]])
 
     ## Create BSseq instance from 'out'
-    BSseq(gr = gr, sampleNames = thisSampleName,
-          M = as.matrix(out[[4L]]),
-          Cov = as.matrix(out[[4L]] + out[[5L]]),
-          rmZeroCov = rmZeroCov)
+    if (hdf5) {
+        bsseq <- BSseq(gr = gr,
+                       sampleNames = thisSampleName,
+                       M = HDF5Array(as.matrix(out[[4L]])),
+                       Cov = HDF5Array(as.matrix(out[[4L]] + out[[5L]])),
+                       rmZeroCov = rmZeroCov)
+    } else {
+        bsseq <- BSseq(gr = gr, sampleNames = thisSampleName,
+                       M = as.matrix(out[[4L]]),
+                       Cov = as.matrix(out[[4L]] + out[[5L]]),
+                       rmZeroCov = rmZeroCov)
+    }
+    bsseq
 }

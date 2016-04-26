@@ -27,7 +27,8 @@ Imports:
     S4Vectors,
     R.utils (>= 2.0.0),
     matrixStats (>= 0.50.0),
-    permute
+    permute,
+    HDF5Array
 Suggests:
     RUnit,
     bsseqData,
@@ -52,6 +53,7 @@ Collate:
     BSmooth.fstat.R
     BSseqStat_class.R
     getStats.R
+    hdf5-kludges.R
 License: Artistic-2.0
 VignetteBuilder: knitr
 URL: https://github.com/kasperdanielhansen/bsseq

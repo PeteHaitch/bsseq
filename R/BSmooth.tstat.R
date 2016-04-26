@@ -1,5 +1,7 @@
+# TOOD: Should hdf5 be the default? Should it guess/recommend the user switch
+#       to hdf5 if they have large/many files?
 BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paired", "group2"),
-                          local.correct = TRUE, maxGap = NULL, qSd = 0.75, k = 101, mc.cores = 1, verbose = TRUE){
+                          local.correct = TRUE, maxGap = NULL, qSd = 0.75, k = 101, mc.cores = 1, verbose = TRUE, hdf5 = FALSE){
     smoothSd <- function(Sds, k) {
         k0 <- floor(k/2)
         if(all(is.na(Sds))) return(Sds)
@@ -20,9 +22,9 @@ BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paire
         xx.reg <- seq(from = min(xx), to = max(xx), by = 2000)
         yy.reg <- tstat.function(xx.reg)
         fit <- locfit(yy.reg ~ lp(xx.reg, h = 25000, deg = 2, nn = 0),
-                      family = "huber", maxk = 50000) 
+                      family = "huber", maxk = 50000)
         correction <- predict(fit, newdata = data.frame(xx.reg = xx))
-        yy - correction 
+        yy - correction
     }
 
     estimate.var <- match.arg(estimate.var)
@@ -38,7 +40,7 @@ BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paire
     if(is.character(group2)) {
         stopifnot(all(group2 %in% sampleNames(BSseq)))
         group2 <- match(group2, sampleNames(BSseq))
-    }    
+    }
     if(is.numeric(group2)) {
         stopifnot(min(group2) >= 1 & max(group2) <= ncol(BSseq))
     } else stop("problems with argument 'group2'")
@@ -48,22 +50,22 @@ BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paire
     stopifnot(length(group1) + length(group2) >= 3)
     if(estimate.var == "paired")
         stopifnot(length(group1) == length(group2))
-    
+
     if(any(rowSums(getCoverage(BSseq)[, c(group1, group2)]) == 0))
         warning("Computing t-statistics at locations where there is no data; consider subsetting the 'BSseq' object first")
-    
+
     if(is.null(maxGap))
         maxGap <- BSseq@parameters$maxGap
     if(is.null(maxGap))
         stop("need to set argument 'maxGap'")
-    
+
     if(verbose) cat("[BSmooth.tstat] preprocessing ... ")
     ptime1 <- proc.time()
     clusterIdx <- makeClusters(BSseq, maxGap = maxGap)
     ptime2 <- proc.time()
     stime <- (ptime2 - ptime1)[3]
     if(verbose) cat(sprintf("done in %.1f sec\n", stime))
-        
+
     if(verbose) cat("[BSmooth.tstat] computing stats within groups ... ")
     ptime1 <- proc.time()
     allPs <- getMeth(BSseq, type = "smooth", what = "perBase",
@@ -73,7 +75,7 @@ BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paire
     ptime2 <- proc.time()
     stime <- (ptime2 - ptime1)[3]
     if(verbose) cat(sprintf("done in %.1f sec\n", stime))
-    
+
     if(verbose) cat("[BSmooth.tstat] computing stats across groups ... ")
     ptime1 <- proc.time()
     switch(estimate.var,
@@ -113,21 +115,21 @@ BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paire
     ptime2 <- proc.time()
     stime <- (ptime2 - ptime1)[3]
     if(verbose) cat(sprintf("done in %.1f sec\n", stime))
-    
+
     if(local.correct) {
         stats <- cbind(rawSds, tstat.sd, group2.means, group1.means,
                        tstat, tstat.corrected)
         colnames(stats) <- c("rawSds", "tstat.sd",
                              "group2.means", "group1.means", "tstat",
                              "tstat.corrected")
- 
+
     } else {
         stats <- cbind(rawSds, tstat.sd, group2.means, group1.means,
                        tstat)
         colnames(stats) <- c("rawSds", "tstat.sd",
                              "group2.means", "group1.means", "tstat")
     }
-    
+
     parameters <- c(BSseq@parameters,
                     list(tstatText = sprintf("BSmooth.tstat (local.correct = %s, maxGap = %d)",
                          local.correct, maxGap),

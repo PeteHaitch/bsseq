@@ -17,10 +17,15 @@ makeClusters <- function(hasGRanges, maxGap = 10^8) {
     names(clusterIdx) <- NULL
     clusterIdx
 }
-    
 
+
+# TOOD: Should hdf5 be the default? Should it guess/recommend the user switch
+#       to hdf5 if they have large/many files?
+# NOTE: hdf5 = TRUE only affects the se and se.coef assays (array-based `M` and
+#       `Cov` assays remain as arrays)
 BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sample", "chromosome"),
-                    mc.preschedule = FALSE, mc.cores = 1, keep.se = FALSE, verbose = TRUE) {
+                    mc.preschedule = FALSE, mc.cores = 1, keep.se = FALSE, verbose = TRUE,
+                    hdf5 = FALSE) {
     smooth <- function(idxes, sampleIdx) {
         ## Assuming that idxes is a set of indexes into the BSseq object
         ## sampleIdx is a single character
@@ -29,10 +34,15 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sam
         if(verbose >= 2)
             cat(sprintf("[BSmooth]   smoothing start: sample:%s, chr:%s, nLoci:%s\n",
                         this_sample_chr[1], this_sample_chr[2], length(idxes)))
-        Cov <- getCoverage(BSseq, type = "Cov")[idxes, sampleIdx]
-        M <- getCoverage(BSseq, type = "M")[idxes, sampleIdx]
+        Cov <- getCoverage(BSseq, type = "Cov")[idxes, sampleIdx, drop = FALSE]
+        M <- getCoverage(BSseq, type = "M")[idxes, sampleIdx, drop = FALSE]
         pos <- start(BSseq)[idxes]
         stopifnot(all(diff(pos) > 0))
+        # TODO: Have to realise DelayedMatrix in order to use which(). Remove
+        #       conditional once fixed
+        if (is(Cov, "DelayedMatrix")) {
+            Cov <- as.array(Cov)
+        }
         wh <- which(Cov != 0)
         nn <- ns / length(wh)
         if(length(wh) <= ns) {
@@ -44,8 +54,24 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sam
                         se.coef = se.coef,
                         trans = NULL, h = h, nn = nn))
         }
+        if (is(M, "DelayedMatrix")) {
+            M <- as.array(M)
+        }
+        # NOTE: Defensive programming; `Cov` has already been coerced to an
+        #       array, but if `which,DelayedMatrix` is implemented then we will
+        #       need to coerce at this stage
+        # TODO: Explore what is most efficient/performant when realising the
+        #       DelayedMatrix objects, e.g., `pmin(as.array(M)[wh], 0.01)` vs
+        #       `pmin(as.array(M[wh]), 0.01)` vs
+        #       `as.array(pmin(M[wh], 0.01))`. Recall that we're only
+        #       processing a single sample's worth of data at this point, so
+        #       can probably afford to realise the entire M using as.array(M)
+        #       and run the rest in memory
+        if (is(Cov, "DelayedMatrix")) {
+            Cov <- as.array(Cov)
+        }
         sdata <- data.frame(pos = pos[wh],
-                            M = pmin(pmax(M[wh], 0.01), Cov[wh] - 0.01),
+                            M = pmin(pmax(M[wh], 0.01),  Cov[wh] - 0.01),
                             Cov = Cov[wh])
         fit <- locfit(M ~ lp(pos, nn = nn, h = h), data = sdata,
                       weights = Cov, family = "binomial", maxk = 10000)
@@ -123,7 +149,7 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sam
     stime.outer <- (ptime.outer2 - ptime.outer1)[3]
     if(verbose)
         cat(sprintf("[BSmooth] smoothing done in %.1f sec\n", stime.outer))
-    
+
     rownames(coef) <- NULL
     colnames(coef) <- sampleNames(BSseq)
     if(!is.null(se.coef)) {
@@ -132,8 +158,14 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sam
     }
 
     if(!is.null(coef))
+        if (hdf5) {
+            coef <- HDF5Array(coef)
+        }
         assay(BSseq, "coef") <- coef
     if(!is.null(se.coef))
+        if (hdf5) {
+            se.coef <- HDF5Array(se.coef)
+        }
         assay(BSseq, "se.coef") <- se.coef
     mytrans <- function(x) {
         y <- x
@@ -150,5 +182,3 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sam
     BSseq@parameters <- parameters
     BSseq
 }
-
-

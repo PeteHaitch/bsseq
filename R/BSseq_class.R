@@ -1,4 +1,4 @@
-setClass("BSseq", contains = "RangedSummarizedExperiment", 
+setClass("BSseq", contains = "RangedSummarizedExperiment",
          representation(trans = "function",
                         parameters = "list"))
 
@@ -71,6 +71,7 @@ setReplaceMethod("sampleNames",
                      object
                  })
 
+# TODO: Redundant, length,SummarizedExperiment-method
 setMethod("length", "BSseq", function(x) {
     length(granges(x))
 })
@@ -93,7 +94,7 @@ getBSseq <- function(BSseq, type = c("Cov", "M", "gr", "coef", "se.coef", "trans
         return(BSseq@parameters)
     if(type == "gr")
         return(BSseq@rowRanges)
-    
+
 }
 
 BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
@@ -111,10 +112,10 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         stop("'gr' needs to have widths of 1")
     if(is.null(M) || is.null(Cov))
         stop("Need M and Cov")
-    if(!is.matrix(M))
-        stop("'M' needs to be a matrix")
-    if(!is.matrix(Cov))
-        stop("'Cov' needs to be a matrix")
+    if(!is.matrix(M) && !is(M, "HDF5Matrix") && !is(M, "DelayedMatrix"))
+        stop("'M' needs to be a matrix or HDF5Matrix or DelayedMatrix")
+    if(!is.matrix(Cov) && !is(Cov, "HDF5Matrix") && !is(Cov, "DelayedMatrix"))
+        stop("'Cov' needs to be a matrix or HDF5Matrix or DelayedMatrix")
     if(length(gr) != nrow(M) ||
        length(gr) != nrow(Cov) ||
        ncol(Cov) != ncol(M))
@@ -139,6 +140,7 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
     if(length(unique(sampleNames)) != ncol(M))
         stop("sampleNames need to be unique and of the right length.")
     ## check that 0 <= M <= Cov and remove positions with Cov = 0
+    # TODO: Need an is.infinite,HDF5Array-method
     if(any(M < 0) || any(M > Cov) || any(is.na(M)) || any(is.na(Cov)) ||
        any(is.infinite(Cov)))
         stop("'M' and 'Cov' may not contain NA or infinite values and 0 <= M <= Cov")
@@ -146,6 +148,9 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         wh <- which(rowSums(Cov) == 0)
         if(length(wh) > 0) {
             gr <- gr[-wh]
+            # TODO: DelayedMatrix objects don't support subassignment `[<-` so
+            #       will need to realise M and Cov using HDF5Dataset() at this
+            #       point
             M <- M[-wh,,drop = FALSE]
             Cov <- Cov[-wh,,drop = FALSE]
         }
@@ -156,19 +161,29 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         mm <- as.matrix(findOverlaps(grR, gr))
         mm <- mm[order(mm[,1]),]
         if(length(grR) == length(gr)) {
-            ## only re-ordering is necessary 
+            ## only re-ordering is necessary
             gr <- grR
+            # TODO: DelayedMatrix objects don't support subassignment `[<-` so
+            #       will need to realise `M`` and `Cov`` using HDF5Dataset() at
+            #       this point
             M <- M[mm[,2],,drop = FALSE]
             Cov <- Cov[mm[,2],,drop = FALSE]
             if(!is.null(coef))
+                # TODO: DelayedMatrix objects don't support subassignment `[<-`
+                #       so will need to realise `coef` using HDF5Dataset() at
+                #       this point
                 coef <- coef[mm[,2],,drop = FALSE]
             if(!is.null(se.coef))
+                # TODO: DelayedMatrix objects don't support subassignment `[<-`
+                #       so will need to realise `se.coef`` using HDF5Dataset()
+                #       at this point
                 se.coef <- se.coef[mm[,2],, drop = FALSE]
         } else {
             warning("multiple positions, collapsing BSseq object\n")
             if(!is.null(coef) || !is.null(se.coef))
                 stop("Cannot collapse when 'coef' or 'se.coef' are present")
             gr <- grR
+            # TODO: Need a split,HDF5Array,numeric-method
             sp <- split(mm[,2], mm[,1])[as.character(1:length(grR))]
             names(sp) <- NULL
             M <- do.call(rbind, lapply(sp, function(ii) colSums(M[ii,, drop = FALSE])))
@@ -199,6 +214,8 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         if(!is.null(rownames(se.coef)))
             rownames(se.coef) <- NULL
     }
+    # TODO: May need to realise `M`, `Cov`, `coef`, and `se.coef` using
+    #       HDF5Dataset() at this point
     assays <- SimpleList(M = M, Cov = Cov, coef = coef, se.coef = se.coef)
     assays <- assays[!sapply(assays, is.null)]
     if(is.null(pData) || all(dim(pData) == c(0,0)))
@@ -213,7 +230,8 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
     BSseq
 }
 
-
+# TODO: Include helper function to update matrix-based BSseq object to a
+#       HDF5matrix-based object?
 setMethod("updateObject", "BSseq",
           function(object, ...) {
                if(.hasSlot(object, "assays")) {
@@ -285,7 +303,7 @@ strandCollapse <- function(BSseq, shift = TRUE) {
 ##                ## Based on the delta method
 ##                se.d <- sqrt((data$se.coef[, sample1] * p1 * (1-p1))^2 +
 ##                             (data$se.coef[, sample2] * p2 * (1-p2))^2)
-               
+
 ##                lower <- d - z * se.d
 ##                upper <- d + z * se.d
 ##                out <- data.frame(d = d, lower = lower, upper = upper)

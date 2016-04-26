@@ -51,7 +51,7 @@ slots for representing smoothed data. This class is an extension of
       names).}
     \item{length}{Unlike for \code{RangedSummarizedExperiment},
       \code{length()} is the number of methylation loci (equal to
-      \code{length(granges(x))}).} 
+      \code{length(granges(x))}).}
     \item{sampleNames,sampleNames<-}{Sample names and its replacement
       function for the object.  This is an alias for \code{colnames}.}
     \item{pData,pData<-}{Obtain and replace the \code{pData} slot of the
@@ -68,15 +68,15 @@ slots for representing smoothed data. This class is an extension of
   This class extends \code{hasGRanges} and therefore inherits a number
   of useful \code{GRanges} methods that operate on the \code{gr} slot,
   used for accessing and setting the genomic locations and also do
-  \code{subsetByOverlaps}. 
-  
+  \code{subsetByOverlaps}.
+
   There are a number of almost methods-like functions for operating on
   objects of class \code{BSseq}, including \code{getBSseq},
   \code{collapseBSseq}, and \code{orderBSseq}.  They are detailed below.
 
   \describe{
     \item{\code{collapseBSseq(BSseq, columns)}}{
-    
+
       is used to collapse an object of class \code{BSseq}.  By
       collapsing we simply mean that certain columns (samples) are merge
       together by summing up the methylation evidence and coverage.
@@ -129,7 +129,7 @@ slots for representing smoothed data. This class is an extension of
       methylation loci.  The input is a list, with each component an object
       of class \code{BSseq}.  The (slower) alternative is to use
       \code{Reduce(combine, list)}. }
-  
+
     \item{\code{strandCollapse(BSseq, shift = TRUE)}}{
 
       This function operates on a \code{BSseq} objects which has
@@ -156,12 +156,12 @@ slots for representing smoothed data. This class is an extension of
   Assay names can conveniently be obtained by the function
   \code{assayNames(x)}
 }
-  
+
 \author{
   Kasper Daniel Hansen \email{khansen@jhsph.edu}
 }
 \seealso{
-  
+
   The package vignette.  \code{\link{BSseq}} for the constructor
   function.  \code{\linkS4class{RangedSummarizedExperiment}}
   for the underlying class.  \code{\link{getBSseq}},
@@ -172,6 +172,14 @@ slots for representing smoothed data. This class is an extension of
 }
 \examples{
 M <- matrix(1:9, 3,3)
+colnames(M) <- c("A1", "A2", "A3")
+BStest <- BSseq(pos = 1:3, chr = c("chr1", "chr2", "chr1"), M = M, Cov = M + 2)
+chrSelectBSseq(BStest, seqnames = "chr1", order = TRUE)
+collapseBSseq(BStest, columns = c("A1" = "A", "A2" = "A", "A3" = "B"))
+
+# Using HDF5Array
+library(HDF5Array)
+M <- HDF5Array(matrix(1:9, 3,3))
 colnames(M) <- c("A1", "A2", "A3")
 BStest <- BSseq(pos = 1:3, chr = c("chr1", "chr2", "chr1"), M = M, Cov = M + 2)
 chrSelectBSseq(BStest, seqnames = "chr1", order = TRUE)
