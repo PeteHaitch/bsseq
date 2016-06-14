@@ -23,9 +23,12 @@ makeClusters <- function(hasGRanges, maxGap = 10^8) {
 #       to hdf5 if they have large/many files?
 # NOTE: hdf5 = TRUE only affects the se and se.coef assays (array-based `M` and
 #       `Cov` assays remain as arrays)
-BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sample", "chromosome"),
-                    mc.preschedule = FALSE, mc.cores = 1, keep.se = FALSE, verbose = TRUE,
-                    hdf5 = FALSE) {
+BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
+                    parallelBy = c("sample", "chromosome"),
+                    mc.preschedule = FALSE, mc.cores = 1, keep.se = FALSE,
+                    verbose = TRUE, hdf5 = FALSE) {
+    # NOTE: smooth() realises M and Cov as array objects on a per-sample or
+    #       per-chromosome basis (depending on value of `clusterBy`)
     smooth <- function(idxes, sampleIdx) {
         ## Assuming that idxes is a set of indexes into the BSseq object
         ## sampleIdx is a single character
@@ -38,11 +41,6 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sam
         M <- getCoverage(BSseq, type = "M")[idxes, sampleIdx, drop = FALSE]
         pos <- start(BSseq)[idxes]
         stopifnot(all(diff(pos) > 0))
-        # TODO: Have to realise DelayedMatrix in order to use which(). Remove
-        #       conditional once fixed
-        if (is(Cov, "DelayedMatrix")) {
-            Cov <- as.array(Cov)
-        }
         wh <- which(Cov != 0)
         nn <- ns / length(wh)
         if(length(wh) <= ns) {
@@ -54,24 +52,23 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sam
                         se.coef = se.coef,
                         trans = NULL, h = h, nn = nn))
         }
-        if (is(M, "DelayedMatrix")) {
+        # NOTE: pmin(as.array(M)[wh], 0.01) is ~300x faster than
+        #       pmin(as.array(M[wh, ]), 0.01) and
+        #       as.array(pmin2(M[wh, ], 0.01))
+        # NOTE: Recall that we're only processing a single sample's or
+        #       chromosome's worth of data at this point, so can afford to
+        #       realise the entire M using as.array(M) and run the rest in
+        #       memory. Anyway, need to realise before passing to locfit().
+        # NOTE: Recall that cannot do 1-dimensional subsetting of a
+        #       DelayedMatrix
+        if (is(M, "DelayedArray") ) {
             M <- as.array(M)
         }
-        # NOTE: Defensive programming; `Cov` has already been coerced to an
-        #       array, but if `which,DelayedMatrix` is implemented then we will
-        #       need to coerce at this stage
-        # TODO: Explore what is most efficient/performant when realising the
-        #       DelayedMatrix objects, e.g., `pmin(as.array(M)[wh], 0.01)` vs
-        #       `pmin(as.array(M[wh]), 0.01)` vs
-        #       `as.array(pmin(M[wh], 0.01))`. Recall that we're only
-        #       processing a single sample's worth of data at this point, so
-        #       can probably afford to realise the entire M using as.array(M)
-        #       and run the rest in memory
-        if (is(Cov, "DelayedMatrix")) {
+        if (is(Cov, "DelayedArray")) {
             Cov <- as.array(Cov)
         }
         sdata <- data.frame(pos = pos[wh],
-                            M = pmin(pmax(M[wh], 0.01),  Cov[wh] - 0.01),
+                            M = pmin(pmax(M[wh], 0.01), Cov[wh] - 0.01),
                             Cov = Cov[wh])
         fit <- locfit(M ~ lp(pos, nn = nn, h = h), data = sdata,
                       weights = Cov, family = "binomial", maxk = 10000)
@@ -157,16 +154,18 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8, parallelBy = c("sam
         colnames(se.coef) <- sampleNames(BSseq)
     }
 
-    if(!is.null(coef))
+    if(!is.null(coef)) {
         if (hdf5) {
             coef <- HDF5Array(coef)
         }
         assay(BSseq, "coef") <- coef
-    if(!is.null(se.coef))
+    }
+    if(!is.null(se.coef)) {
         if (hdf5) {
             se.coef <- HDF5Array(se.coef)
         }
         assay(BSseq, "se.coef") <- se.coef
+    }
     mytrans <- function(x) {
         y <- x
         ix <- which(x < 0)

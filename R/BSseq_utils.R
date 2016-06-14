@@ -51,7 +51,14 @@ getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
     what <- match.arg(what)
     z <- abs(qnorm((1 - alpha)/2, mean = 0, sd = 1))
     if(is.null(regions) && type == "smooth") {
-        meth <- getBSseq(BSseq, type = "trans")(getBSseq(BSseq, type = "coef"))
+        # TODO: Have to realise `coef` if it is a DelayedArray because
+        #       DelayedArray does not currently support 1D-subsetting (which
+        #       is required by getBSseq(BSseq, type = "trans")
+        coef <- getBSseq(BSseq, type = "coef")
+        if (is(coef, "DelayedArray")) {
+            coef <- as.array(coef)
+        }
+        meth <- getBSseq(BSseq, type = "trans")(coef)
         if(confint) {
             upper <- getBSseq(BSseq, type = "trans")(getBSseq(BSseq, type = "coef") +
                                       z * getBSseq(BSseq, type = "se.coef"))

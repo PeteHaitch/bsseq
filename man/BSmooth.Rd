@@ -67,8 +67,9 @@ BS.fit
 
 # Using HDF5Array
 library(HDF5Array)
-assays(BS.chr22) <- endoapply(assays(BS.chr22), HDF5Array)
-BS.fit <- BSmooth(BS.chr22, verbose = TRUE, hdf5 = TRUE)
-BS.fit
+BS.chr22.hdf5 <- BS.chr22
+assays(BS.chr22.hdf5) <- endoapply(assays(BS.chr22), HDF5Array)
+BS.fit.hdf5 <- BSmooth(BS.chr22.hdf5, verbose = TRUE, hdf5 = TRUE)
+BS.fit.hdf5
 }
 }

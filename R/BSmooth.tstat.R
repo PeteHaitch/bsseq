@@ -1,7 +1,10 @@
 # TOOD: Should hdf5 be the default? Should it guess/recommend the user switch
 #       to hdf5 if they have large/many files?
-BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paired", "group2"),
-                          local.correct = TRUE, maxGap = NULL, qSd = 0.75, k = 101, mc.cores = 1, verbose = TRUE, hdf5 = FALSE){
+# NOTE: hdf5 = TRUE only affects new assays, not existing ones
+BSmooth.tstat <- function(BSseq, group1, group2,
+                          estimate.var = c("same", "paired", "group2"),
+                          local.correct = TRUE, maxGap = NULL, qSd = 0.75,
+                          k = 101, mc.cores = 1, verbose = TRUE, hdf5 = FALSE){
     smoothSd <- function(Sds, k) {
         k0 <- floor(k/2)
         if(all(is.na(Sds))) return(Sds)
@@ -51,6 +54,10 @@ BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paire
     if(estimate.var == "paired")
         stopifnot(length(group1) == length(group2))
 
+    # UP TO HERE: Benchmark with and without calling as.array()
+    # TODO: rowSums(DelayedMatrix) can be very slow if @index slot has a large
+    #       amount of i-subsetting. Contacting Hervé for suggested way to
+    #       fix or work around this.
     if(any(rowSums(getCoverage(BSseq)[, c(group1, group2)]) == 0))
         warning("Computing t-statistics at locations where there is no data; consider subsetting the 'BSseq' object first")
 
@@ -68,6 +75,8 @@ BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paire
 
     if(verbose) cat("[BSmooth.tstat] computing stats within groups ... ")
     ptime1 <- proc.time()
+    # NOTE: Need to realise `allPs` as an array since we use
+    #       matrixStats::rawSds() and matrixStats::rowVars()
     allPs <- getMeth(BSseq, type = "smooth", what = "perBase",
                      confint = FALSE)
     group1.means <- rowMeans(allPs[, group1, drop = FALSE], na.rm = TRUE)
@@ -89,8 +98,8 @@ BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paire
            },
            "same" = {
                rawSds <- sqrt( ((length(group1) - 1) * rowVars(allPs, cols = group1) +
-                                (length(group2) - 1) * rowVars(allPs, cols = group2)) /
-                              (length(group1) + length(group2) - 2))
+                                    (length(group2) - 1) * rowVars(allPs, cols = group2)) /
+                                   (length(group1) + length(group2) - 2))
                smoothSds <- do.call(c, mclapply(clusterIdx, function(idx) {
                    smoothSd(rawSds[idx], k = k)
                }, mc.cores = mc.cores))
@@ -117,22 +126,34 @@ BSmooth.tstat <- function(BSseq, group1, group2, estimate.var = c("same", "paire
     if(verbose) cat(sprintf("done in %.1f sec\n", stime))
 
     if(local.correct) {
+        # NOTE: Alternatively, could make each column of `stats` a HDF5Array
+        #       and then cbind() to form a DelayedMatrix
         stats <- cbind(rawSds, tstat.sd, group2.means, group1.means,
                        tstat, tstat.corrected)
         colnames(stats) <- c("rawSds", "tstat.sd",
                              "group2.means", "group1.means", "tstat",
                              "tstat.corrected")
+        if (hdf5) {
+            stats <- HDF5Array(stats)
+        }
 
     } else {
+        # NOTE: Alternatively, could make each column of `stats` a HDF5Array
+        #       and then cbind() to form a DelayedMatrix
         stats <- cbind(rawSds, tstat.sd, group2.means, group1.means,
                        tstat)
         colnames(stats) <- c("rawSds", "tstat.sd",
                              "group2.means", "group1.means", "tstat")
+        if (hdf5) {
+            stats <- HDF5Array(stats)
+        }
     }
 
+    # UP TO HERE: Need to generalise the BSseqTstat class to allow a
+    #             DelayedMatrix/DelayedArray/HDF5Array in `stats` slot
     parameters <- c(BSseq@parameters,
                     list(tstatText = sprintf("BSmooth.tstat (local.correct = %s, maxGap = %d)",
-                         local.correct, maxGap),
+                                             local.correct, maxGap),
                          group1 = group1, group2 = group2, k = k, qSd = qSd,
                          local.correct = local.correct, maxGap = maxGap))
     out <- BSseqTstat(gr = granges(BSseq), stats = stats, parameters = parameters)

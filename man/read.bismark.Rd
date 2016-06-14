@@ -111,16 +111,14 @@
 
   # Using HDF5Array
   library(HDF5Array)
-  infile <- system.file("extdata/test_data.fastq_bismark.bismark.cov.gz",
-                        package = 'bsseq')
-  bismarkBSseq <- read.bismark(files = infile,
-                               sampleNames = "test_data",
-                               rmZeroCov = FALSE,
-                               strandCollapse = FALSE,
-                               fileType = "cov",
-                               verbose = TRUE,
-                               hdf5 = TRUE)
-  bismarkBSseq
+  bismarkBSseq.hdf5 <- read.bismark(files = infile,
+                                    sampleNames = "test_data",
+                                    rmZeroCov = FALSE,
+                                    strandCollapse = FALSE,
+                                    fileType = "cov",
+                                    verbose = TRUE,
+                                    hdf5 = TRUE)
+  bismarkBSseq.hdf5
 }
 
 \author{

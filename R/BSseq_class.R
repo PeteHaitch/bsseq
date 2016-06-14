@@ -97,6 +97,8 @@ getBSseq <- function(BSseq, type = c("Cov", "M", "gr", "coef", "se.coef", "trans
 
 }
 
+# NOTE: No `hdf5` argument. If the user wants a HDF5Matrix or DelayedMatrix
+#       then `M` and `Cov` should already be in this format.
 BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
                   trans = NULL, parameters = NULL, pData = NULL,
                   gr = NULL, pos = NULL, chr = NULL, sampleNames = NULL,
@@ -140,7 +142,6 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
     if(length(unique(sampleNames)) != ncol(M))
         stop("sampleNames need to be unique and of the right length.")
     ## check that 0 <= M <= Cov and remove positions with Cov = 0
-    # TODO: Need an is.infinite,HDF5Array-method
     if(any(M < 0) || any(M > Cov) || any(is.na(M)) || any(is.na(Cov)) ||
        any(is.infinite(Cov)))
         stop("'M' and 'Cov' may not contain NA or infinite values and 0 <= M <= Cov")
@@ -148,9 +149,6 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         wh <- which(rowSums(Cov) == 0)
         if(length(wh) > 0) {
             gr <- gr[-wh]
-            # TODO: DelayedMatrix objects don't support subassignment `[<-` so
-            #       will need to realise M and Cov using HDF5Dataset() at this
-            #       point
             M <- M[-wh,,drop = FALSE]
             Cov <- Cov[-wh,,drop = FALSE]
         }
@@ -163,31 +161,36 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         if(length(grR) == length(gr)) {
             ## only re-ordering is necessary
             gr <- grR
-            # TODO: DelayedMatrix objects don't support subassignment `[<-` so
-            #       will need to realise `M`` and `Cov`` using HDF5Dataset() at
-            #       this point
             M <- M[mm[,2],,drop = FALSE]
             Cov <- Cov[mm[,2],,drop = FALSE]
             if(!is.null(coef))
-                # TODO: DelayedMatrix objects don't support subassignment `[<-`
-                #       so will need to realise `coef` using HDF5Dataset() at
-                #       this point
                 coef <- coef[mm[,2],,drop = FALSE]
             if(!is.null(se.coef))
-                # TODO: DelayedMatrix objects don't support subassignment `[<-`
-                #       so will need to realise `se.coef`` using HDF5Dataset()
-                #       at this point
                 se.coef <- se.coef[mm[,2],, drop = FALSE]
         } else {
             warning("multiple positions, collapsing BSseq object\n")
             if(!is.null(coef) || !is.null(se.coef))
                 stop("Cannot collapse when 'coef' or 'se.coef' are present")
             gr <- grR
-            # TODO: Need a split,HDF5Array,numeric-method
             sp <- split(mm[,2], mm[,1])[as.character(1:length(grR))]
             names(sp) <- NULL
-            M <- do.call(rbind, lapply(sp, function(ii) colSums(M[ii,, drop = FALSE])))
-            Cov <- do.call(rbind, lapply(sp, function(ii) colSums(Cov[ii,, drop = FALSE])))
+            # NOTE: colSums(DelayedMatrix) returns a matrix, but want to
+            #       preserve M and Cov as DelayedMatrix/HDF5Matrix if that's
+            #       what these were
+            M_class <- class(M)
+            M <- do.call(rbind, lapply(sp, function(ii) {
+                colSums(M[ii,, drop = FALSE])
+            }))
+            if (M_class %in% c("DelayedMatrix", "HDF5Matrix")) {
+                M <- HDF5Array(M)
+            }
+            Cov_class <- class(Cov)
+            Cov <- do.call(rbind, lapply(sp, function(ii) {
+                colSums(Cov[ii,, drop = FALSE])
+            }))
+            if (Cov_class %in% c("DelayedMatrix", "HDF5Matrix")) {
+                Cov <- HDF5Array(Cov)
+            }
         }
     }
     if(is.null(colnames(M)) || any(sampleNames != colnames(M)))

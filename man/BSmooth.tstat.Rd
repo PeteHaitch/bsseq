@@ -84,15 +84,19 @@ if(require(bsseqData)) {
 
   # Using HDF5Array
   library(HDF5Array)
-  data(keepLoci.ex)
-  data(BS.cancer.ex.fit)
-  BS.cancer.ex.fit <- updateObject(BS.cancer.ex.fit)
-  assays(BS.cancer.ex.fit) <- endoapply(assays(BS.cancer.ex.fit), HDF5Array)
+  # TODO: Subset before calling HDF5Array() otherwise the resulting
+  #       DelayedMatrix carries around the i-subsetting in the `@index` slot,
+  #       which must be realised when any delayed ops are performed; contacting
+  #       Hervé to fix
+  BS.cancer.ex.fit.hdf5 <- BS.cancer.ex.fit[keepLoci.ex, ]
+  assays(BS.cancer.ex.fit.hdf5) <- endoapply(assays(BS.cancer.ex.fit.hdf5),
+                                             HDF5Array)
   ## Remember to subset the BSseq object, see vignette for explanation
-  BS.tstat <- BSmooth.tstat(BS.cancer.ex.fit[keepLoci.ex,],
-                            group1 = c("C1", "C2", "C3"),
-                            group2 = c("N1", "N2", "N3"),
-                            estimate.var = "group2")
-  BS.tstat
+  BS.tstat.hdf5 <- BSmooth.tstat(BS.cancer.ex.fit.hdf5,
+                                 group1 = c("C1", "C2", "C3"),
+                                 group2 = c("N1", "N2", "N3"),
+                                 estimate.var = "group2",
+                                 hdf5 = TRUE)
+  BS.tstat.hdf5
 }
 }

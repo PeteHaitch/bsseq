@@ -1,5 +1,8 @@
-setClass("BSseqTstat", contains = "hasGRanges", 
-         representation(stats = "matrix",
+# TODO: Is using a class union the best way to achieve this?
+setClassUnion("matrixOrDelayedMatrix", c("matrix", "DelayedMatrix"))
+
+setClass("BSseqTstat", contains = "hasGRanges",
+         representation(stats = "matrixOrDelayedMatrix",
                         parameters = "list")
          )
 setValidity("BSseqTstat", function(object) {
