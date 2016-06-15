@@ -53,7 +53,6 @@ Collate:
     BSmooth.fstat.R
     BSseqStat_class.R
     getStats.R
-    hdf5-kludges.R
 License: Artistic-2.0
 VignetteBuilder: knitr
 URL: https://github.com/kasperdanielhansen/bsseq

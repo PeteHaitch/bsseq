@@ -80,7 +80,3 @@ S3method("plot", "BSseqTstat")
 ## Fixes, to be removed
 
 exportMethods("assays", "assayNames")
-
-## HDF5Array kludges
-export("is.infinite")
-
