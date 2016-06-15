@@ -53,7 +53,8 @@ getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
     if(is.null(regions) && type == "smooth") {
         # TODO: Have to realise `coef` if it is a DelayedArray because
         #       DelayedArray does not currently support 1D-subsetting (which
-        #       is required by getBSseq(BSseq, type = "trans")
+        #       is required by getBSseq(BSseq, type = "trans"); change if this
+        #       is changed
         coef <- getBSseq(BSseq, type = "coef")
         if (is(coef, "DelayedArray")) {
             coef <- as.array(coef)
@@ -118,7 +119,6 @@ getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
         return(outMatrix)
     }
 }
-
 
 getCoverage <- function(BSseq, regions = NULL, type = c("Cov", "M"),
                     what = c("perBase", "perRegionAverage", "perRegionTotal")) {

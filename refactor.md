@@ -116,6 +116,9 @@ M <- HDF5Array(m)
 m[which(m > 3)]
 M[which(M > 3)]
 ```
+- [ ] How to add additional DelayedArray-based methods? E.g.,
+    - [ ] `quantile()`
+    - [ ] `density()`
 
 ## Files checked
 
@@ -123,9 +126,9 @@ M[which(M > 3)]
 - [x] `BSmooth.R`
 - [x] `BSmooth.tstat.R`
 - [x] `BSseq_class.R`
-- [ ] `BSseq_utils.R`
+- [x] `BSseq_utils.R`
 - [ ] `BSseqStat_class.R`
-- [ ] `BSseqTstat_class.R`
+- [x] `BSseqTstat_class.R`
 - [ ] `combine.R`
 - [ ] `dmrFinder.R`
 - [ ] `fisher.R`

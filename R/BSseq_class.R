@@ -198,7 +198,7 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
     if(is.null(colnames(Cov)) || any(sampleNames != colnames(Cov)))
         colnames(Cov) <- sampleNames
     if(!is.null(coef)) {
-        if(!is.matrix(coef) ||
+        if((!is.matrix(coef) && !is(coef, "DelayedArray")) ||
            nrow(coef) != nrow(M) ||
            ncol(coef) != ncol(M))
             stop("'coef' does not have the right dimensions")

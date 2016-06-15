@@ -1,3 +1,5 @@
+# NOTE: If any of the objects have DelayedArray assay elements, then the
+#       corresponding combined assay element is a HDF5Array
 setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
     ## All of this assumes that we are place x and y "next" to each other,
     ##  ie. we are not combining the same set of samples sequenced at different times
@@ -9,15 +11,48 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
     pData <- combine(as(pData(x), "data.frame"), as(pData(y), "data.frame"))
     if(identical(granges(x), granges(y))) {
         gr <- granges(x)
-        M <- cbind(getBSseq(x, "M"), getBSseq(y, "M"))
-        Cov <- cbind(getBSseq(x, "Cov"), getBSseq(y, "Cov"))
+        M_x <- getBSseq(x, "M")
+        M_y <- getBSseq(y, "M")
+        if (is(M_x, "DelayedArray") && is.matrix(M_y)) {
+            M_y <- HDF5Array(M_y)
+        }
+        if (is.matrix(M_x) && is(M_y, "DelayedArray")) {
+            M_x <- HDF5Array(M_x)
+        }
+        M <- cbind(M_x, M_y)
+        Cov_x <- getBSseq(x, "Cov")
+        Cov_y <- getBSseq(y, "Cov")
+        if (is(Cov_x, "DelayedArray") && is.matrix(Cov_y)) {
+            Cov_y <- HDF5Array(Cov_y)
+        }
+        if (is.matrix(Cov_x) && is(Cov_y, "DelayedArray")) {
+            Cov_x <- HDF5Array(Cov_x)
+        }
+        Cov <- cbind(Cov_x, Cov_y)
         if(!hasBeenSmoothed(x) || !hasBeenSmoothed(y)) {
             coef <- NULL
             se.coef <- NULL
             trans <- NULL
         } else {
-            coef <- cbind(getBSseq(x, "coef"), getBSseq(y, "coef"))
-            se.coef <- cbind(getBSseq(x, "se.coef"), getBSseq(y, "se.coef"))
+            coef_x <- getBSseq(x, "coef")
+            coef_y <- getBSseq(y, "coef")
+            if (is(coef_x, "DelayedArray") && is.matrix(coef_y)) {
+                coef_y <- HDF5Array(coef_y)
+            }
+            if (is.matrix(coef_x) && is(coef_y, "DelayedArray")) {
+                coef_x <- HDF5Array(coef_x)
+            }
+            coef <- cbind(coef_x, coef_y)
+
+            se.coef_x <- getBSseq(x, "se.coef")
+            se.coef_y <- getBSseq(y, "se.coef")
+            if (is(se.coef_x, "DelayedArray") && is.matrix(se.coef_y)) {
+                se.coef_y <- HDF5Array(se.coef_y)
+            }
+            if (is.matrix(se.coef_x) && is(se.coef_y, "DelayedArray")) {
+                se.coef_x <- HDF5Array(se.coef_x)
+            }
+            se.coef <- cbind(se.coef_x, se.coef_y)
             trans <- getBSseq(x, "trans")
         }
     } else {
@@ -27,32 +62,90 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
         sampleNames <- c(sampleNames(x), sampleNames(y))
         ## FIXME: there is no check that the two sampleNames are disjoint.
         M <- Cov <- matrix(0, nrow = length(gr), ncol = length(sampleNames))
+        M_hdf5 <- is(getBSseq(x, "M"), "DelayedArray") ||
+            is(getBSseq(y, "M"), "DelayedArray")
+        Cov_hdf5 <- is(getBSseq(x, "Cov"), "DelayedArray") ||
+            is(getBSseq(y, "Cov"), "DelayedArray")
         colnames(M) <- colnames(Cov) <- sampleNames
-        M[mm.x[,1], 1:ncol(x)] <- getBSseq(x, "M")[mm.x[,2],]
-        M[mm.y[,1], ncol(x) + 1:ncol(y)] <- getBSseq(y, "M")[mm.y[,2],]
-        Cov[mm.x[,1], 1:ncol(x)] <- getBSseq(x, "Cov")[mm.x[,2],]
-        Cov[mm.y[,1], ncol(x) + 1:ncol(y)] <- getBSseq(y, "Cov")[mm.y[,2],]
+        M_x <- getBSseq(x, "M")[mm.x[,2],]
+        if (is(M_x, "DelayedArray")) {
+            M_x <- as.array(M_x)
+        }
+        M[mm.x[,1], 1:ncol(x)] <- M_x
+        M_y <- getBSseq(y, "M")[mm.y[,2],]
+        if (is(M_y, "DelayedArray")) {
+            M_y <- as.array(M_y)
+        }
+        M[mm.y[,1], ncol(x) + 1:ncol(y)] <- M_y
+        if (M_hdf5) {
+            M <- HDF5Array(M)
+        }
+        Cov_x <- getBSseq(x, "Cov")[mm.x[,2],]
+        if (is(Cov_x, "DelayedArray")) {
+            Cov_x <- as.array(Cov_x)
+        }
+        Cov[mm.x[,1], 1:ncol(x)] <- Cov_x
+        Cov_y <- getBSseq(y, "Cov")[mm.y[,2],]
+        if (is(Cov_y, "DelayedArray")) {
+            Cov_y <- as.array(Cov_y)
+        }
+        Cov[mm.y[,1], ncol(x) + 1:ncol(y)] <- Cov_y
+        if (Cov_hdf5) {
+            Cov <- HDF5Array(Cov)
+        }
         if(!hasBeenSmoothed(x) || !hasBeenSmoothed(y)) {
             coef <- NULL
             se.coef <- NULL
             trans <- NULL
         } else {
+            # TODO: Check this conditional
             trans <- x@trans
             coef <- matrix(0, nrow = length(gr), ncol = length(sampleNames))
+            coef_hdf5 <- is(getBSseq(x, "coef"), "DelayedArray") ||
+                is(getBSseq(y, "coef"), "DelayedArray")
             colnames(coef) <- rownames(pData)
-            if(hasBeenSmoothed(x))
-                coef[mm.x[,1], 1:ncol(x)] <- getBSseq(x, "coef")[mm.x[,2],]
-            if(hasBeenSmoothed(y))
-                coef[mm.y[,1], ncol(x) + 1:ncol(y)] <- getBSseq(y, "coef")[mm.y[,2],]
+            if(hasBeenSmoothed(x)) {
+                coef_x <- getBSseq(x, "coef")[mm.x[,2],]
+                if (is(coef_x, "DelayedArray")) {
+                    coef_x <- as.array(M_x)
+                }
+                coef[mm.x[,1], 1:ncol(x)] <- coef_x
+            }
+            if(hasBeenSmoothed(y)) {
+                coef_y <- getBSseq(y, "coef")[mm.y[,2],]
+                if (is(coef_y, "DelayedArray")) {
+                    coef_y <- as.array(M_y)
+                }
+                coef[mm.y[,1], ncol(x) + 1:ncol(x)] <- coef_y
+            }
+            if (coef_hdf5) {
+                coef <- HDF5Array(coef)
+            }
             if(is.null(getBSseq(x, "se.coef")) && is.null(getBSseq(x, "se.coef")))
                 se.coef <- NULL
             else {
-                se.coef <- matrix(0, nrow = length(gr), ncol = length(sampleNames))
+                se.coef <- matrix(0, nrow = length(gr),
+                                  ncol = length(sampleNames))
+                se.coef_hdf5 <- is(getBSseq(x, "se.coef"), "DelayedArray") ||
+                    is(getBSseq(y, "se.coef"), "DelayedArray")
                 colnames(se.coef) <- sampleNames(pData)
-                if(!is.null(getBSseq(x, "se.coef")))
-                    se.coef[mm.x[,1], 1:ncol(x)] <- getBSseq(x, "se.coef")[mm.x[,2],]
-                if(!is.null(getBSseq(y, "se.coef")))
-                    se.coef[mm.y[,1], ncol(x) + 1:ncol(y)] <- getBSseq(y, "se.coef")[mm.y[,2],]
+                if(!is.null(getBSseq(x, "se.coef"))) {
+                    se.coef_x <- getBSseq(x, "se.coef")[mm.x[,2],]
+                    if (is(se.coef_x, "DelayedArray")) {
+                        se.coef_x <- as.array(M_x)
+                    }
+                    se.coef[mm.x[,1], 1:ncol(x)] <- se.coef_x
+                }
+                if(!is.null(getBSseq(y, "se.coef"))) {
+                    se.coef_y <- getBSseq(y, "se.coef")[mm.y[,2],]
+                    if (is(se.coef_y, "DelayedArray")) {
+                        se.coef_y <- as.array(M_y)
+                    }
+                    se.coef[mm.y[,1], ncol(x) + 1:ncol(x)] <- se.coef_y
+                }
+                if (se.coef_hdf5) {
+                    se.coef <- HDF5Array(se.coef)
+                }
             }
         }
     }
@@ -60,6 +153,7 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
           pData = pData, trans = trans, rmZeroCov = FALSE)
 })
 
+# UP TO HERE
 combineList <- function(x, ...) {
     if(class(x) == "BSseq")
         x <- list(x, ...)
