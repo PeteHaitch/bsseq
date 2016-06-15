@@ -129,6 +129,8 @@ M[which(M > 3)]
     - [ ] `quantile()`
     - [ ] `density()`
 
+- [ ] `as.integer,DelayedArray-method` for when _DelayedArray_ contains logical
+
 ## Files checked
 
 - [ ] `BSmooth.fstat.R`
