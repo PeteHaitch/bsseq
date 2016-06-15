@@ -70,6 +70,11 @@ might want to `cbind()` a bunch of _DelayedArray_ objects and write to disk as
 new _HDF5Array_ iff any of the objects where themselves HDF5-backed. This has 
 implications for the code where I do `is(x, "DelayedArray")` because I am 
 currently assuming this is equivalent to "is `x` a HDF5-backed _DelayedArray_".
+- [ ] If package offers HDF5Array and array/matrix options, how to best specify 
+and/or determine that function/method should return HDF5-backed result. 
+Currently, using `hdf5` argument to relevant functions. Perhaps there should be 
+a package option? Perhaps function/method should default to `hdf5 = TRUE` if 
+input includes HDF5-backed data?
 
 ## Missing methods
 
@@ -130,6 +135,8 @@ M[which(M > 3)]
     - [ ] `density()`
 
 - [ ] `as.integer,DelayedArray-method` for when _DelayedArray_ contains logical
+- [ ] Is it possible to serialise a _HDF5Array_? `saveRDS()` will store 
+original `@seed@file` which is not guaranteed to exist across sessions.
 
 ## Files checked
 
@@ -141,11 +148,11 @@ M[which(M > 3)]
 - [ ] `BSseqStat_class.R`
 - [x] `BSseqTstat_class.R`
 - [x] `combine.R`
-- [ ] `dmrFinder.R`
-- [ ] `fisher.R`
-- [ ] `getStats.R`
-- [ ] `gof_stats.R`
-- [ ] `hasGRanges.R`
+- [ ] `dmrFinder.R` (need to first update `BSseqStat_class.R`)
+- [x] `fisher.R`
+- [ ] `getStats.R` (need to first update `BSseqStat_class.R`)
+- [x] `gof_stats.R`
+- [x] `hasGRanges.R`
 - [ ] `permutations.R`
 - [ ] `plotting.R`
 - [x] `read.bismark.R`

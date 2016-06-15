@@ -75,9 +75,8 @@ BSseq(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
   BS1.hdf5 <- BSseq(chr = c("chr1", "chr2", "chr1"), pos = c(1, 2, 3),
                     M = M.hdf5, Cov = Cov.hdf5, sampleNames = c("A", "B", "C"))
   BS1.hdf5
-  # TODO: This example errors
   BS2.hdf5 <- BSseq(chr = c("chr1", "chr1", "chr1"), pos = c(1, 1, 1),
                     M = M.hdf5, Cov = Cov.hdf5, sampleNames = c("A", "B", "C"))
-  BS2
+  BS2.hdf5
 
 }
