@@ -55,7 +55,6 @@ BSmooth.tstat <- function(BSseq, group1, group2,
     if(estimate.var == "paired")
         stopifnot(length(group1) == length(group2))
 
-    # UP TO HERE: Benchmark with and without calling as.array()
     # TODO: rowSums(DelayedMatrix) can be very slow if @index slot has a large
     #       amount of i-subsetting. Contacting Hervé for suggested way to
     #       fix or work around this.
@@ -76,10 +75,13 @@ BSmooth.tstat <- function(BSseq, group1, group2,
 
     if(verbose) cat("[BSmooth.tstat] computing stats within groups ... ")
     ptime1 <- proc.time()
-    # NOTE: Need to realise `allPs` as an array since we use
-    #       matrixStats::rawSds() and matrixStats::rowVars()
     allPs <- getMeth(BSseq, type = "smooth", what = "perBase",
                      confint = FALSE)
+    if (is(allPs, "DelayedMatrix")) {
+        # NOTE: Need to realise `allPs` as an array since we use
+        #       matrixStats::rowSds(allPs) and matrixStats::rowVars(allPs)
+        allPs <- as.array(allPs)
+    }
     group1.means <- rowMeans(allPs[, group1, drop = FALSE], na.rm = TRUE)
     group2.means <- rowMeans(allPs[, group2, drop = FALSE], na.rm = TRUE)
     ptime2 <- proc.time()
