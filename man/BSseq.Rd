@@ -47,7 +47,7 @@ BSseq(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
   \code{phenoData} is a way to specify pheno data (as known from the
   \code{ExpressionSet} and \code{eSet} classes), at a minimum
   \code{sampleNames} should be given (if they are not present, the
-  function uses \code{col.names(M)}).  
+  function uses \code{col.names(M)}).
 }
 \value{
   An object of class \code{BSseq}.
@@ -61,10 +61,23 @@ BSseq(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
 \examples{
   M <- matrix(0:8, 3, 3)
   Cov <- matrix(1:9, 3, 3)
-  BS1 <- BSseq(chr = c("chr1", "chr2", "chr1"), pos = c(1,2,3),
-               M = M, Cov = Cov, sampleNames = c("A","B", "C"))
+  BS1 <- BSseq(chr = c("chr1", "chr2", "chr1"), pos = c(1, 2, 3),
+               M = M, Cov = Cov, sampleNames = c("A", "B", "C"))
   BS1
-  BS2 <- BSseq(chr = c("chr1", "chr1", "chr1"), pos = c(1,1,1),
-               M = M, Cov = Cov, sampleNames = c("A","B", "C"))
+  BS2 <- BSseq(chr = c("chr1", "chr1", "chr1"), pos = c(1, 1, 1),
+               M = M, Cov = Cov, sampleNames = c("A", "B", "C"))
   BS2
+
+  # Using HDF5Array
+  library(HDF5Array)
+  M.hdf5 <- HDF5Array(M)
+  Cov.hdf5 <- HDF5Array(Cov)
+  BS1.hdf5 <- BSseq(chr = c("chr1", "chr2", "chr1"), pos = c(1, 2, 3),
+                    M = M.hdf5, Cov = Cov.hdf5, sampleNames = c("A", "B", "C"))
+  BS1.hdf5
+  # TODO: This example errors
+  BS2.hdf5 <- BSseq(chr = c("chr1", "chr1", "chr1"), pos = c(1, 1, 1),
+                    M = M.hdf5, Cov = Cov.hdf5, sampleNames = c("A", "B", "C"))
+  BS2
+
 }

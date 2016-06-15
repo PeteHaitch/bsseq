@@ -21,8 +21,8 @@ makeClusters <- function(hasGRanges, maxGap = 10^8) {
 
 # TOOD: Should hdf5 be the default? Should it guess/recommend the user switch
 #       to hdf5 if they have large/many files?
-# NOTE: hdf5 = TRUE only affects the se and se.coef assays (array-based `M` and
-#       `Cov` assays remain as arrays)
+# NOTE: hdf5 = TRUE only affects assays created by BSmooth(), i.e. the `coef`
+#       and `se.coef` assays, and not existing assays such as `M` and `Cov`
 BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
                     parallelBy = c("sample", "chromosome"),
                     mc.preschedule = FALSE, mc.cores = 1, keep.se = FALSE,

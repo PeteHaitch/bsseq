@@ -1,6 +1,7 @@
 # TOOD: Should hdf5 be the default? Should it guess/recommend the user switch
 #       to hdf5 if they have large/many files?
-# NOTE: hdf5 = TRUE only affects new assays, not existing ones
+# NOTE: hdf5 = TRUE only affects output created by BSmooth.tstat(), i.e. those
+#       matrix-like objects in the `stats` slot
 BSmooth.tstat <- function(BSseq, group1, group2,
                           estimate.var = c("same", "paired", "group2"),
                           local.correct = TRUE, maxGap = NULL, qSd = 0.75,
@@ -149,8 +150,6 @@ BSmooth.tstat <- function(BSseq, group1, group2,
         }
     }
 
-    # UP TO HERE: Need to generalise the BSseqTstat class to allow a
-    #             DelayedMatrix/DelayedArray/HDF5Array in `stats` slot
     parameters <- c(BSseq@parameters,
                     list(tstatText = sprintf("BSmooth.tstat (local.correct = %s, maxGap = %d)",
                                              local.correct, maxGap),

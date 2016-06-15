@@ -61,6 +61,15 @@ it pristine.
 - [ ] `pmax2()`, `pmin2()` exist but not `pmax()` and `pmin()`; why?
 - [ ] `rowSums()` is painfully slow on test data `bsseqData::BS.cancer.ex.fit` 
 with ~600k rows
+- [ ] If combining _DelayedArray_ objects (e.g., with `cbind()`/`rbind()` or as 
+part of `bsseq::combine()`/ `bsseq::combineList()`), should the method write a 
+new HDF5 file or return a _DelayedArray_ object? E.g., is there a substantial 
+overhead for parsing multiple HDF5 files in subsequent calls?
+- [ ] How to check if a _DelayedArray_ has a `HDF5Dataset` for its `seed`? E.g., 
+might want to `cbind()` a bunch of _DelayedArray_ objects and write to disk as 
+new _HDF5Array_ iff any of the objects where themselves HDF5-backed. This has 
+implications for the code where I do `is(x, "DelayedArray")` because I am 
+currently assuming this is equivalent to "is `x` a HDF5-backed _DelayedArray_".
 
 ## Missing methods
 
@@ -129,7 +138,7 @@ M[which(M > 3)]
 - [x] `BSseq_utils.R`
 - [ ] `BSseqStat_class.R`
 - [x] `BSseqTstat_class.R`
-- [ ] `combine.R`
+- [x] `combine.R`
 - [ ] `dmrFinder.R`
 - [ ] `fisher.R`
 - [ ] `getStats.R`

@@ -62,7 +62,7 @@ read.bismark <- function(files,
         cat(sprintf("[read.bismark] Joining samples ... "))
     }
     ptime1 <- proc.time()
-    allOut <- combineList(allOut)
+    allOut <- combineList(allOut, hdf5 = hdf5)
     ptime2 <- proc.time()
     stime <- (ptime2 - ptime1)[3L]
     if (verbose) {

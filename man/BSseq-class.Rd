@@ -179,10 +179,10 @@ collapseBSseq(BStest, columns = c("A1" = "A", "A2" = "A", "A3" = "B"))
 
 # Using HDF5Array
 library(HDF5Array)
-M <- HDF5Array(matrix(1:9, 3,3))
-colnames(M) <- c("A1", "A2", "A3")
-BStest <- BSseq(pos = 1:3, chr = c("chr1", "chr2", "chr1"), M = M, Cov = M + 2)
-chrSelectBSseq(BStest, seqnames = "chr1", order = TRUE)
-collapseBSseq(BStest, columns = c("A1" = "A", "A2" = "A", "A3" = "B"))
+M.hdf5 <- HDF5Array(M)
+BStest.hdf5 <- BSseq(pos = 1:3, chr = c("chr1", "chr2", "chr1"), M = M.hdf5,
+                     Cov = M.hdf5 + 2)
+chrSelectBSseq(BStest.hdf5, seqnames = "chr1", order = TRUE)
+collapseBSseq(BStest.hdf5, columns = c("A1" = "A", "A2" = "A", "A3" = "B"))
 }
 \keyword{classes}

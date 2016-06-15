@@ -2,6 +2,12 @@
 \title{bsseq news}
 \encoding{UTF-8}
 
+\section{Version 1.9.x}{
+  \itemize{
+    \item Support HDF5-backed BSseq objects via the HDF5Array package
+  }
+}
+
 \section{Version 1.7.x}{
   \itemize{
     \item Fixing an error with reading multiple samples aligned with
