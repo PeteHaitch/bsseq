@@ -6,6 +6,7 @@ dmrFinder <- function(bstat, cutoff = NULL, qcutoff = c(0.025, 0.975),
         dmrStat <- bstat@stats[, stat]
     }
     if(is(bstat, "BSseqStat")) {
+        # TODO: Check this branch
         dmrStat <- getStats(bstat, what = "stat")
     }
     subverbose <- max(as.integer(verbose) - 1L, 0L)
@@ -13,8 +14,20 @@ dmrFinder <- function(bstat, cutoff = NULL, qcutoff = c(0.025, 0.975),
         cutoff <- quantile(dmrStat, qcutoff)
     if(length(cutoff) == 1)
         cutoff <- c(-cutoff, cutoff)
-    direction <- as.integer(dmrStat >= cutoff[2])
-    direction[dmrStat <= cutoff[1]] <- -1L
+    direction_logical <- dmrStat >= cutoff[2]
+    if (is(direction_logical, "DelayedArray")) {
+        # NOTE: Need to realise `direction_logical` as an array since we use
+        #       as.integer(direction_logical)
+        direction_logical <- as.array(direction_logical)
+    }
+    direction <- as.integer(direction_logical)
+    idx <- dmrStat <= cutoff[1]
+    if (is(idx, "DelayedArray")) {
+        # NOTE: Need to realise `idx` as an array because can't subset vector
+        #       by a DelayedArray
+        idx <- as.array(idx)
+    }
+    direction[idx] <- -1L
     direction[is.na(direction)] <- 0L
     chrs <- as.character(seqnames(bstat))
     positions <- start(bstat)
