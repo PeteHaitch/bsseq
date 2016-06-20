@@ -9,6 +9,14 @@ BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE){
     ptime1 <- proc.time()
     allPs <- getMeth(BSseq, type = "smooth", what = "perBase",
                      confint = FALSE)
+    if (is(allPs, "DelayedMatrix")) {
+        # TODO: Check NOTE
+        # NOTE: Need to realise `allPs` as an array since we use
+        #       matrixStats::rowSds(allPs) and matrixStats::rowVars(allPs)
+        allPs <- as.array(allPs)
+    }
+
+
     fit <- lmFit(allPs, design)
     fitC <- contrasts.fit(fit, contrasts)
     ## Need
@@ -114,9 +122,9 @@ localCorrectStat <- function(BSseqStat, threshold = c(-15,15), mc.cores = 1, ver
         xx.reg <- seq(from = min(xx), to = max(xx), by = 2000)
         yy.reg <- tstat.function(xx.reg)
         fit <- locfit(yy.reg ~ lp(xx.reg, h = 25000, deg = 2, nn = 0),
-                      family = "huber", maxk = 50000) 
+                      family = "huber", maxk = 50000)
         correction <- predict(fit, newdata = data.frame(xx.reg = xx))
-        yy - correction 
+        yy - correction
     }
     maxGap <- BSseqStat$parameters$maxGap
     if(verbose) cat("[BSmooth.tstat] preprocessing ... ")
