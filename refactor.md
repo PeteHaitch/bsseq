@@ -1,21 +1,43 @@
 # HDF5Array notes
 
-Bits and pieces noticed during refactor of _bsseq_ to work with _HDF5Array_-based assays.
+Bits and pieces noticed during refactor of _bsseq_ to work with 
+_HDF5Array_-based assays.
 
 ## Things to be aware of
 
 `x` is a _HDF5Array_ object
 
-- Many operations convert `x` to a _DelayedMatrix_ object
+- Many (all?) operations convert `x` to a _DelayedMatrix_ object
     - E.g., `[,HDF5Array,*-method`, `dimnames<-,HDF5Array,*-method`
     - Use `as.array()` to realise the result in memory
     - Use `HDF5Dataset()` to realise the result on disk
-- The location of automatically created HDF5 datasets is set by `setHDF5DumpFile()`, which uses `tempfile()`
-    - Will want to use fast, local disk for intermediate files but shared (possibly slower) disk for more permanent files
-- _HDF5Array_ do not support character arrays
-    - ~`HDF5Array(matrix(letters[1:10], ncol = 2))` returns an error because it things it's being passed a filename.~ 
-    - No longer true
-    
+- The location of automatically created HDF5 datasets is set by 
+`setHDF5DumpFile()`, which uses `tempfile()`
+    - Will want to use fast, local disk for intermediate files but shared 
+    (possibly slower) disk for more permanent files
+- Try to wrap all operations in a _DelayedArray_, then realise in memory (using 
+`as.array()`) or on disk (using `writeHDF5Dataset()`) at the last possible 
+moment. There may be occasions where its better to realise a result in memory 
+and then wrap it in a _DelayedArray_. E.g., if all seeds are themselves 
+_DelayedArray_ objects and are in memory, then it might make sense to realise 
+the result in memory and wrap the result in a _DelayedArray_ rather than to 
+store all the seeds. It might be hard to know when to do this automatically, 
+but I think it should be an easy option for a developer/user to invoke. Here's 
+an illustration
+
+```r
+x <- matrix(1:1000000)
+a <- DelayedArray(x)
+b <- DelayedArray(x * 10)
+d <- DelayedArray(x * 100)
+e1 <- (a + b) / d
+e2 <- as.array(e1)
+e3 <- DelayedArray(e2)
+pryr::object_size(e1)
+pryr::object_size(e2)
+pryr::object_size(e3)
+```
+
 ## Questions
 
 ### Asked Hervé 2016-04-24
@@ -56,25 +78,71 @@ also be slightly faster to realize next time, but that counts very
 little in the balance compared to the high price you just paid to make
 it pristine.
 
-### TODO: Ask Hervé
+### Asked Hervé 2016-06-16
 
-- [ ] `pmax2()`, `pmin2()` exist but not `pmax()` and `pmin()`; why?
-- [ ] `rowSums()` is painfully slow on test data `bsseqData::BS.cancer.ex.fit` 
-with ~600k rows
-- [ ] If combining _DelayedArray_ objects (e.g., with `cbind()`/`rbind()` or as 
-part of `bsseq::combine()`/ `bsseq::combineList()`), should the method write a 
-new HDF5 file or return a _DelayedArray_ object? E.g., is there a substantial 
-overhead for parsing multiple HDF5 files in subsequent calls?
-- [ ] How to check if a _DelayedArray_ has a `HDF5Dataset` for its `seed`? E.g., 
-might want to `cbind()` a bunch of _DelayedArray_ objects and write to disk as 
-new _HDF5Array_ iff any of the objects where themselves HDF5-backed. This has 
+- [x] `pmax2()`, `pmin2()` exist but not `pmax()` and `pmin()`; why?
+> There are several problems with `base::pmax()` and `base::pmin()` that make 
+them hard to reuse here.
+
+- [x] If combining (e.g., with `cbind()`/`rbind()` or as part of 
+`bsseq::combine()`/ `bsseq::combineList()`) _DelayedArray_ objects with a 
+_HDF5Dataset_ `@seed`, how to decide if the method should write a new 
+HDF5 file or return a _DelayedArray_ object? E.g., is there a substantial 
+overhead for parsing _DelayedArray_ objects comprising multiple HDF5 files in 
+subsequent calls?
+> The answer is the same as for your "should a DelayedArray be realized
+as a HDF5Dataset before going in a SummarizedExperiment object"
+question. The general advice is to always delay realization as much
+as possible. That's because the price of realization is much much
+bigger than the overhead of operating on a DelayedArray with multiple
+seeds.
+
+- [x] Relatedly, might there be need for a method to check if a 
+_DelayedArray_ has a _HDF5Dataset_ for its `seed`? E.g., might want to 
+`cbind()` a bunch of _DelayedArray_ objects and write to disk as new 
+_HDF5Array_ iff any of the objects where themselves HDF5-backed. This has 
 implications for the code where I do `is(x, "DelayedArray")` because I am 
 currently assuming this is equivalent to "is `x` a HDF5-backed _DelayedArray_".
-- [ ] If package offers HDF5Array and array/matrix options, how to best specify 
-and/or determine that function/method should return HDF5-backed result. 
+> I'm not sure we need this. But if you show me a concrete use case where
+this might be useful I could change my mind.
+
+This is similar to the issue I'm having when an operation makes a new 
+_DelayedArray_ with multiple seed (see 'Things to be aware of' above).
+
+- [x] If a package offers HDF5Array and array/matrix options, how to best 
+specify and/or determine that function/method should return HDF5-backed result. 
 Currently, using `hdf5` argument to relevant functions. Perhaps there should be 
 a package option? Perhaps function/method should default to `hdf5 = TRUE` if 
 input includes HDF5-backed data?
+> A good question. For which I'm not sure I have a good answer. I've
+plans to modify summarizeOverlaps() to let the user choose if they
+want the returned SummarizedExperiment object to be in memory (the
+default) or HDF5Array-backed. For this one I think I'll add an
+extra argument to the function.
+
+### TODO: Ask Hervé
+
+- [ ] How to realise DelayedArray object in memory but wrap result in a 
+DelayedArray? E.g.,
+
+```r
+x <- matrix(1:1000000)
+a <- DelayedArray(x)
+b <- DelayedArray(x * 10)
+d <- DelayedArray(x * 100)
+e1 <- (a + b) / d
+e2 <- as.array(e1)
+e3 <- DelayedArray(e2)
+# Better of realising in memory and then wrapping in DelayedArray (size e3 < e1)
+pryr::object_size(e1)
+pryr::object_size(e2)
+pryr::object_size(e3)
+```
+
+- [ ] Why does `rowMeans,DelayedMatrix` not use `base::rowMeans()` internally 
+but rather uses '`base::rowSums() / ncol()`'?
+- [ ] How to make function, e.g., `matrixStats::rowVars()`, 'block processing 
+friendly'?
 
 ## Missing methods
 
@@ -97,6 +165,17 @@ Added as of `v1.1.8`.
 
 Fixed as of `v1.1.8`.
 
+### Asked Hervé 2016-06-16
+
+- [x] `rbind,DelayedMatrix-method` and `cbind,DelayedMatrix-method` fail if 
+`...` includes `NULL` objects. Contrast with `rbind()` and `cbind()` if `...` 
+includes _array_ and `NULL` objects
+> Unfortunately I'm not sure I can do anything about this. The `NULL`
+arguments break dispatch ...
+
+So I need to remove `NULL` elements before binding, e.g., 
+`do.call(rbind, (lst[sapply(lst, function(x) !is.null(x))]))`
+
 ## Wishlist
 
 ### Asked Hervé 2016-04-24
@@ -105,9 +184,10 @@ Fixed as of `v1.1.8`.
 
 Added as of `v1.1.8`.
 
-### TODO: Ask Hervé
+### Asked Hervé 2016-06-16
 
-- [ ] Suggest that `rowSums()` (resp. `colSums`) be optimised if `@index` has a **large** amount of i-subsetting (resp. j-subsetting). E.g.:
+- [x] Could `rowSums()` (resp. `colSums`) be optimised if `@index` has a
+**large** amount of i-subsetting (resp. j-subsetting). E.g.:
 
 ```r
 library(HDF5Array)
@@ -120,41 +200,94 @@ system.time(rowSums(h)[i])
 system.time(rowSums(h[ii, ]))
 system.time(rowSums(h)[ii])
 ```
+> This is caused by an inefficiency in rhdf5::h5read() when 'index' is 
+specified ... Surprisingly, reading a subset of the dataset is slower than 
+reading the full dataset!
 
-- [ ] Is 1D-style subsetting ever going to be supported? E.g.:
+HDF5ARray may get its own `h5read()`-like function, optimised for its specific 
+use case(s)
+
+- [x] Is 1D-style subsetting ever going to be supported? E.g. this is an op 
+used a bit in __bsseq__:
 
 ```r
 library(HDF5Array)
 m <- matrix(1:10, ncol = 2)
 M <- HDF5Array(m)
 m[which(m > 3)]
+# Errors
 M[which(M > 3)]
 ```
-- [ ] How to add additional DelayedArray-based methods? E.g.,
-    - [ ] `quantile()`
-    - [ ] `density()`
+> Sure. I'll add this.
 
-- [ ] `as.integer,DelayedArray-method` for when _DelayedArray_ contains logical
-- [ ] Is it possible to serialise a _HDF5Array_? `saveRDS()` will store 
+- [x] `as.integer,DelayedArray-method` for when _DelayedArray_ contains logical
+> We can't have as.integer() do this because as.integer() should always
+return an integer vector (i.e. is.integer() must be TRUE on the
+result). This is a very strong expectation. Breaking this rule is too
+dangerous e.g. for code that calls as.integer() on an object before
+passing it to a C function.
+
+A really neat alternative is to do the following (a delayed op)
+
+```r
+x <- DelayedArray(matrix(sample(c(TRUE, FALSE), 1000, replace = TRUE)))
+x + 0L
+```
+
+- [x] Is it possible to serialise a _HDF5Array_? `saveRDS()` will store 
 original `@seed@file` which is not guaranteed to exist across sessions.
+
+This proved much more complicated than I first thought. There are 
+two different scenarios to consider:
+
+1. "Going home for the day". I want to save my SE and load it again tomorrow
+to continue work on the same system.
+2. "Sharing with others". I want to share with collaborators/colleagues/BioC
+community a file that contains everything they need to create the
+SE on their machine.
+
+For (1), it makes sense to set a non-temporary, absolute path for the .h5 files
+using setHDF5DumpFile(). Then the serialised SE is small on disk and the .h5
+files will still exist at the end of the R session, so tomorrow when we load the
+SE everything "just works" [there's probably some complications to worry about
+if we use a relative path in setHDF5DumpFile() and load the object in
+a different
+working dir]. In this case, there's no point in carrying additional
+copies of the
+(possibly large) .h5 file(s) in the serialised object written to disk.
+
+For (2), perhaps its as simple as bundling up the saved SE object (.rda or .rds)
+with the .h5 files in a tarball (or similar).
+
+See email exchange for full details and brainstorming. This is going to require 
+a fair bit of work to implement in full generality.
+
+### TODO: Ask Hervé
+
+- [ ] `DelayedArray,vector` so I don't have to keep doing 
+`DelayedArray(as.matrix(x))`
 
 ## Files checked
 
 - [ ] `BSmooth.fstat.R`
-- [x] `BSmooth.R`
-- [x] `BSmooth.tstat.R`
-- [x] `BSseq_class.R`
-- [x] `BSseq_utils.R`
+- [x] `BSmooth.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
+- [ ] `BSmooth.tstat.R`
+- [x] `BSseq_class.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
+- [ ] `BSseq_utils.R` (__UP TO HERE:__ See __TODO__)
 - [ ] `BSseqStat_class.R`
-- [x] `BSseqTstat_class.R`
-- [x] `combine.R`
+- [x] `BSseqTstat_class.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
+- [x] `combine.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
 - [ ] `dmrFinder.R` (need to first update `BSseqStat_class.R`)
 - [x] `fisher.R`
 - [ ] `getStats.R` (need to first update `BSseqStat_class.R`)
-- [x] `gof_stats.R`
-- [x] `hasGRanges.R`
+- [x] `gof_stats.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
+- [x] `hasGRanges.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
 - [ ] `permutations.R`
 - [ ] `plotting.R`
-- [x] `read.bismark.R`
-- [ ] `read.bsmooth.R`
-- [ ] `utils.R`
+- [x] `read.bismark.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
+- [ ] `read.bsmooth.R` (started work, but low priority since rarely used interface. See __UP TO HERE__)
+- [x] `utils.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
+
+## Misc. TODOs
+
+- [ ] `is()` vs. `inherits()` (motivated by [https://github.com/Bioconductor-mirror/BiocParallel/commit/420aeff4a222415908a4fd9028d907c473f42043](https://github.com/Bioconductor-mirror/BiocParallel/commit/420aeff4a222415908a4fd9028d907c473f42043))
