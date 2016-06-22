@@ -3,7 +3,7 @@
 \alias{read.umtab2}
 \title{
   Parsing UM tab files (legacy output) containing output from the
-  BSmooth aligner. 
+  BSmooth aligner.
 }
 \description{
   Parsing UM tab files containing output from the bisulfite aligner
@@ -21,14 +21,14 @@ read.umtab2(dirs, sampleNames = NULL, rmZeroCov = FALSE,
 }
 \arguments{
   \item{dirs}{Input directories.  Usually each sample is in a different
-    directory.} 
+    directory.}
   \item{pattern}{An optional pattern, see \code{list.files} in the base
-    package.} 
+    package.}
   \item{sampleNames}{sample names, based on the order of \code{dirs}.}
   \item{rmZeroCov}{Should methylation loci that have zero coverage in
     all samples be removed.  This will result in a much smaller object
     if the data originates from (targeted) capture bisulfite
-    sequencing.} 
+    sequencing.}
   \item{keepU}{A vector of U columns which are kept.}
   \item{keepM}{A vector of M columns which are kept.}
   \item{readCycle}{Should the cycle columns be returned?}
@@ -72,5 +72,8 @@ umDir <- system.file("umtab", package = "bsseqData")
 sampleNames <- list.files(umDir)
 dirs <- file.path(umDir, sampleNames, "umtab")
 umData <- read.umtab(dirs, sampleNames)
+
+# Using HDF5Array
+umData.hdf5 <- read.umtab(dirs, sampleNames, hdf5 = TRUE)
 }
 }

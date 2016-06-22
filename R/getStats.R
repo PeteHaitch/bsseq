@@ -1,3 +1,4 @@
+# DONE
 getStats <- function(bstat, regions = NULL, ...) {
     stopifnot(is(bstat, "BSseqTstat") || is(bstat, "BSseqStat"))
     if(is(bstat, "BSseqTstat"))
@@ -5,6 +6,7 @@ getStats <- function(bstat, regions = NULL, ...) {
     getStats_BSseqStat(bstat, regions = regions, ...)
 }
 
+# TODO
 getStats_BSseqStat <- function(BSseqStat, regions = NULL, what = NULL) {
     stopifnot(is(BSseqStat, "BSseqStat"))
     if(!is.null(what)) {
@@ -34,6 +36,7 @@ getStats_BSseqStat <- function(BSseqStat, regions = NULL, what = NULL) {
     regionStats
 }
 
+# DONE
 getStats_BSseqTstat <- function(BSseqTstat, regions = NULL, stat = "tstat.corrected") {
     stopifnot(is(BSseqTstat, "BSseqTstat"))
     if(is.null(regions))

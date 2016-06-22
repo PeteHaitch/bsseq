@@ -1,3 +1,4 @@
+# TODO
 read.umtab2 <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
                         readCycle = FALSE, keepFilt = FALSE,
                         pattern = NULL, keepU, keepM, verbose = TRUE) {
@@ -61,8 +62,8 @@ read.umtab2 <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
                 Mcy = Mcy, Ucy = Ucy, csums = csums))
 }
 
-
-read.umtab2.chr <- function(files, sampleNames = NULL, 
+# TODO
+read.umtab2.chr <- function(files, sampleNames = NULL,
                             keepM, keepU, readCycle = FALSE, keepFilt = FALSE,
                             verbose = TRUE) {
     columnHeaders <- strsplit(readLines(files[1], n = 1), "\t")[[1]]
@@ -148,7 +149,8 @@ read.umtab2.chr <- function(files, sampleNames = NULL,
                 csums = csums))
 }
 
-read.umtab2.chr2 <- function(files, sampleNames = NULL, 
+# TODO
+read.umtab2.chr2 <- function(files, sampleNames = NULL,
                              keepM, keepU, verbose = TRUE) {
     columnHeaders <- strsplit(readLines(files[1], n = 1), "\t")[[1]]
     if("strand" %in% columnHeaders)
@@ -187,7 +189,7 @@ read.umtab2.chr2 <- function(files, sampleNames = NULL,
     }, grLoc)
     nPos <- length(grLoc)
     nSamples <- length(files)
-    
+
     M <- matrix(0L, nrow = nPos, ncol = nSamples)
     colnames(M)  <- sampleNames
     U <- Mcy <- Ucy <- M
@@ -234,19 +236,21 @@ read.umtab2.chr2 <- function(files, sampleNames = NULL,
 }
 
 
-
+# WIP
 read.umtab <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
                        pattern = NULL,
                        keepU = c("U10", "U20", "U30", "U40"),
-                       keepM = c("M10", "M20", "M30", "M40"), verbose = TRUE) {
+                       keepM = c("M10", "M20", "M30", "M40"), verbose = TRUE,
+                       hdf5 = FALSE) {
     filesPerDir <- lapply(dirs, function(xx) sort(list.files(xx, pattern = pattern, full.names = TRUE)))
     if(!all(sapply(filesPerDir, function(xx) all(basename(xx) == basename(filesPerDir[[1]])))))
         warning("'dirs' does not contain the exact same file names")
     allChrs <- as.list(seq_along(filesPerDir[[1]]))
     for(ii in seq_along(filesPerDir[[1]])) {
         chrRead <- read.umtab.chr(sapply(filesPerDir, function(xx) xx[ii]),
-                                  keepM = keepM, keepU = keepU, sampleNames = sampleNames,
-                                  verbose = verbose)
+                                  keepM = keepM, keepU = keepU,
+                                  sampleNames = sampleNames,
+                                  verbose = verbose, hdf5 = hdf5)
         if(rmZeroCov && length(chrRead) != 0){
             wh <- which(rowSums(chrRead$U + chrRead$M) > 0)
             chrRead$M <- chrRead$M[wh,]
@@ -260,6 +264,10 @@ read.umtab <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
         }
         allChrs[[ii]] <- chrRead
     }
+
+    # UP TO HERE: Need HDF5Array-specific logic. rbind,DelayedArray-method
+    #             fails if any arguments are NULL. Also, want to realise M and
+    #             Cov as *new* HDF5-backed objects
     BSdata <- BSseq(chr = do.call(c, lapply(allChrs, function(xx) xx$chr)),
                     pos = do.call(c, lapply(allChrs, function(xx) xx$pos)),
                     M = do.call(rbind, lapply(allChrs, function(xx) xx$M)),
@@ -276,11 +284,13 @@ read.umtab <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
                 Mcy = Mcy, Ucy = Ucy, csums = csums))
 }
 
-
+# DONE
 read.umtab.chr <- function(files, sampleNames = NULL,
                            keepM = c("M10", "M20", "M30", "M40"),
-                           keepU = c("U10", "U20", "U30", "U40"), verbose = TRUE) {
-    columnHeaders <- c("Chr", "Off", "M0", "M10", "M20", "M30", "M40", "Mqual", "Mcy",
+                           keepU = c("U10", "U20", "U30", "U40"),
+                           verbose = TRUE, hdf5 = FALSE) {
+    columnHeaders <- c("Chr", "Off", "M0", "M10", "M20", "M30", "M40",
+                       "Mqual", "Mcy",
                        "U0", "U10", "U20", "U30", "U40", "Uqual", "Ucy",
                        "MapaFW", "MapaRC", "CGContFW", "CGContRC")
     what0 <- c(list(character(0)), replicate(19, integer(0)))
@@ -329,10 +339,17 @@ read.umtab.chr <- function(files, sampleNames = NULL,
         Ucy[,ii] <- intab[["Ucy"]]
         csums[,ii] <- as.integer(sapply(intab[c(allMnames, allUnames)], sum))
     }
+    if (hdf5) {
+        M <- HDF5Array(M)
+        U <- HDF5Array(U)
+        Mcy <- HDF5Array(Mcy)
+        Ucy <- HDF5Array(Ucy)
+    }
     return(list(chr = chr, pos = pos, Map = Map, GC = GC, M = M, U = U,
                 Mcy = Mcy, Ucy = Ucy, csums = csums))
 }
 
+# TODO
 read.bsmoothDirRaw <- function(dir, seqnames = NULL, keepCycle = FALSE, keepFilt = FALSE,
                                header = TRUE, verbose = TRUE) {
     dir <- normalizePath(dir)
@@ -369,7 +386,7 @@ read.bsmoothDirRaw <- function(dir, seqnames = NULL, keepCycle = FALSE, keepFilt
     what0[int] <- replicate(length(int), integer(0))
     if(!keepCycle)
         what0[c("Mcy", "Ucy")] <- replicate(2, NULL)
-    if(!keepFilt) 
+    if(!keepFilt)
         what0[grep("^filt", names(what0))] <- replicate(length(grep("^filt", names(what0))), NULL)
     outList <- lapply(allChrFiles, function(thisfile) {
         if(verbose)
@@ -399,7 +416,7 @@ read.bsmoothDirRaw <- function(dir, seqnames = NULL, keepCycle = FALSE, keepFilt
     gr
 }
 
-
+# TODO
 sampleRawToBSseq <- function(gr, qualityCutoff = 20, sampleName = NULL, rmZeroCov = FALSE) {
     numberQualsGreaterThan <- function(cvec) {
         onestring <- paste(cvec, collapse = "")
@@ -420,6 +437,7 @@ sampleRawToBSseq <- function(gr, qualityCutoff = 20, sampleName = NULL, rmZeroCo
     BSseq(gr = gr, M = M, Cov = Cov, sampleNames = sampleName, rmZeroCov = rmZeroCov)
 }
 
+# TODO
 read.bsmooth <- function(dirs, sampleNames = NULL, seqnames = NULL, returnRaw = FALSE,
                          qualityCutoff = 20, rmZeroCov = FALSE, verbose = TRUE) {
     dirs <- normalizePath(dirs, mustWork = TRUE)
@@ -448,7 +466,7 @@ read.bsmooth <- function(dirs, sampleNames = NULL, seqnames = NULL, returnRaw = 
         }
         ptime2 <- proc.time()
         stime <- (ptime2 - ptime1)[3]
-        if(verbose) cat(sprintf("done in %.1f secs\n", stime)) 
+        if(verbose) cat(sprintf("done in %.1f secs\n", stime))
         out
     })
     if(!returnRaw) {
@@ -462,6 +480,7 @@ read.bsmooth <- function(dirs, sampleNames = NULL, seqnames = NULL, returnRaw = 
     allOut
 }
 
+# TODO
 parsingPipeline <- function(dirs, qualityCutoff = 20, outDir, seqnames = NULL,
                             subdir = "ev_bt2_cpg_tab", timing = FALSE) {
     if(!all(file.exists(dirs)))

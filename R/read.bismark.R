@@ -1,4 +1,4 @@
-# TOOD: Should hdf5 be the default? Should it guess/recommend the user switch
+# TODO: Should hdf5 be the default? Should it guess/recommend the user switch
 #       to hdf5 if they have large/many files?
 read.bismark <- function(files,
                          sampleNames,
@@ -35,6 +35,7 @@ read.bismark <- function(files,
             cat(sprintf("[read.bismark] Reading file '%s' ... ", files[ii]))
         }
         ptime1 <- proc.time()
+        # UP TO HERE: Need to modify BSseq() to add `hdf5` argument
         if (fileType == "cov" || fileType == "oldBedGraph") {
             out <- read.bismarkCovRaw(thisfile = files[ii],
                                       thisSampleName = sampleNames[ii],
@@ -71,7 +72,7 @@ read.bismark <- function(files,
     allOut
 }
 
-# TOOD: Should hdf5 be the default?
+# TODO: Should hdf5 be the default?
 read.bismarkCovRaw <- function(thisfile,
                                thisSampleName,
                                rmZeroCov,
@@ -97,23 +98,15 @@ read.bismarkCovRaw <- function(thisfile,
                   ranges = IRanges(start = out[[2L]], width = 1L))
 
     ## Create BSseq instance from 'out'
-    if (hdf5) {
-        bsseq <- BSseq(gr = gr,
-                       M = HDF5Array(as.matrix(out[[5L]])),
-                       Cov = HDF5Array(as.matrix(out[[5L]] + out[[6L]])),
-                       sampleNames = thisSampleName,
-                       rmZeroCov = rmZeroCov)
-    } else {
-        bsseq <- BSseq(gr = gr,
-                       M = as.matrix(out[[5L]]),
-                       Cov = as.matrix(out[[5L]] + out[[6L]]),
-                       sampleNames = thisSampleName,
-                       rmZeroCov = rmZeroCov)
-    }
-    bsseq
+    BSseq(gr = gr,
+          M = as.matrix(out[[5L]]),
+          Cov = as.matrix(out[[5L]] + out[[6L]]),
+          sampleNames = thisSampleName,
+          rmZeroCov = rmZeroCov,
+          hdf5 = hdf5)
 }
 
-# TOOD: Should hdf5 be the default?
+# TODO: Should hdf5 be the default?
 read.bismarkCytosineReportRaw <- function(thisfile,
                                           thisSampleName,
                                           rmZeroCov,
@@ -146,17 +139,11 @@ read.bismarkCytosineReportRaw <- function(thisfile,
                   strand = out[[3]])
 
     ## Create BSseq instance from 'out'
-    if (hdf5) {
-        bsseq <- BSseq(gr = gr,
-                       sampleNames = thisSampleName,
-                       M = HDF5Array(as.matrix(out[[4L]])),
-                       Cov = HDF5Array(as.matrix(out[[4L]] + out[[5L]])),
-                       rmZeroCov = rmZeroCov)
-    } else {
-        bsseq <- BSseq(gr = gr, sampleNames = thisSampleName,
-                       M = as.matrix(out[[4L]]),
-                       Cov = as.matrix(out[[4L]] + out[[5L]]),
-                       rmZeroCov = rmZeroCov)
-    }
-    bsseq
+    BSseq(gr = gr,
+          sampleNames = thisSampleName,
+          M = as.matrix(out[[4L]]),
+          Cov = as.matrix(out[[4L]] + out[[5L]]),
+          rmZeroCov = rmZeroCov,
+          hdf5 = hdf5)
+
 }

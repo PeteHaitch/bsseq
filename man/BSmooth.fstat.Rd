@@ -56,6 +56,18 @@ BSmooth.fstat(BSseq, design, contrasts, verbose = TRUE)
                                   design,
                                   contrasts)
         BS.stat
+
+        # Using HDF5Array
+        library(HDF5Array)
+        # TODO: Subset before calling HDF5Array() otherwise the resulting
+        #       DelayedMatrix carries around the i-subsetting in the `@index`
+        #       slot, which must be realised when any delayed ops are
+        #       performed; contacting Hervé to fix
+        BS.cancer.ex.fit.hdf5 <- BS.cancer.ex.fit[keepLoci.ex, ]
+        assays(BS.cancer.ex.fit.hdf5) <- endoapply(assays(BS.cancer.ex.fit.hdf5),
+                                                   HDF5Array)
+        # TODO: Continue example
+
     }
   }
 }

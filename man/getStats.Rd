@@ -43,5 +43,10 @@ if(require(bsseqData)) {
   reg <- GRanges(seqnames = c("chr22", "chr22"),
      ranges = IRanges(start = c(1, 2*10^7), end = c(2*10^7 +1, 4*10^7)))
   head(getStats(BS.cancer.ex.tstat, regions = reg))
+
+  # Using HDF5Array
+  library(HDF5Array)
+  BS.cancer.ex.tstat.hdf5 <- BS.cancer.ex.tstat
+  BS.cancer.ex.tstat.hdf5@stats <- HDF5Array(BS.cancer.ex.tstat.hdf5@stats)
 }
 }

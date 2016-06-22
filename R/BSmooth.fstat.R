@@ -38,7 +38,7 @@ BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE){
     stats <- list(rawSds = rawSds,
                   cor.coefficients = cor.coefficients,
                   rawTstats = rawTstats)
-    out <- BSseqStat(gr = granges(BSseq),
+    out <- BSseqStat(gr = rowRanges(BSseq),
                      stats = stats, parameters = parameters)
     out
 }
