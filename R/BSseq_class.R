@@ -237,6 +237,12 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
 #       HDF5matrix-based object?
 setMethod("updateObject", "BSseq",
           function(object, ...) {
+              # NOTE: Need to update trans slot of existing BSseq objects
+              #       because of proposed change to default definition of trans
+              #       returned by BSmooth().
+              if(.hasSlot(object, "trans")) {
+                  object@trans <- .plogis
+              }
                if(.hasSlot(object, "assays")) {
                    # call method for RangedSummarizedExperiment objects
                    callNextMethod()

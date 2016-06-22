@@ -19,7 +19,7 @@ makeClusters <- function(hasGRanges, maxGap = 10^8) {
 }
 
 
-# TOOD: Should hdf5 be the default? Should it guess/recommend the user switch
+# TODO: Should hdf5 be the default? Should it guess/recommend the user switch
 #       to hdf5 if they have large/many files?
 # NOTE: hdf5 = TRUE only affects assays created by BSmooth(), i.e. the `coef`
 #       and `se.coef` assays, and not existing assays such as `M` and `Cov`
@@ -166,14 +166,25 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
         }
         assay(BSseq, "se.coef") <- se.coef
     }
-    mytrans <- function(x) {
-        y <- x
-        ix <- which(x < 0)
-        ix2 <- which(x > 0)
-        y[ix] <- exp(x[ix])/(1 + exp(x[ix]))
-        y[ix2] <- 1/(1 + exp(-x[ix2]))
-        y
-    }
+    # NOTE: The commented out version of mytrans() is equivalent to the new one.
+    #       However, the new version is approximately 2x as fast and uses less
+    #       memory since there is no need to create the index vectors `ix` and
+    #       `ix2`. Moreover, it's  easy to register plogis() as a delayed op.
+    # mytrans <- function(x) {
+    #     y <- x
+    #     # TODO: If can't use plogis(), then use x[x < 0] and x[x > 0] instead
+    #     #         of creating indices with which(); this requires
+    #     #         1D-subsetting of HDF5Array objects (see email from Hervé on
+    #     #         2016-06-19).
+    #     ix <- which(x < 0)
+    #     ix2 <- which(x >= 0)
+    #     y[ix] <- exp(x[ix])/(1 + exp(x[ix]))
+    #     y[ix2] <- 1/(1 + exp(-x[ix2]))
+    #     y
+    # }
+    # TODO: This will require that existing BSseq objects are update using
+    #       (an updated) updateObject()
+    mytrans <- .plogis
     environment(mytrans) <- baseenv()
     BSseq@trans <- mytrans
     parameters <- list(smoothText = sprintf("BSmooth (ns = %d, h = %d, maxGap = %d)", ns, h, maxGap),

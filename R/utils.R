@@ -35,12 +35,26 @@ data.frame2GRanges <- function(df, keepColumns = FALSE, ignoreStrand = FALSE) {
         NULL
 }
 
+# TODO: No longer required
 setMethod("assays", "BSseq",
           function(x, ..., withDimnames = TRUE) {
               x@assays$field("data")
           })
 
+# TODO: No longer required
 setMethod("assayNames", "BSseq",
           function(x, ...) {
               names(x@assays$field("data"))
           })
+# stats::plogis() generalised to handle DelayedArray input
+# TODO: Could make into a method if that simplifies dispatch
+.plogis <- function(x) {
+    # TODO: Have asked Hervé what is the correct way to register a delayed
+    # op, i.e. is there an officially supported (and exported) method?
+    if (is(x, "DelayedArray")) {
+        y <- HDF5Array:::register_delayed_op(x, plogis)
+    } else {
+        y <- plogis(x)
+    }
+    y
+}

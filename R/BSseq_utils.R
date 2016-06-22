@@ -35,7 +35,8 @@ orderBSseq <- function(BSseq, seqOrder = NULL) {
 
 
 getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
-                    what = c("perBase", "perRegion"), confint = FALSE, alpha = 0.95) {
+                    what = c("perBase", "perRegion"), confint = FALSE,
+                    alpha = 0.95) {
     p.conf <- function(p, n, alpha) {
         z <- abs(qnorm((1 - alpha)/2, mean = 0, sd = 1))
         upper <- (p + z^2/(2*n) + z*sqrt(  (p*(1-p) + z^2/(4*n)) / n)) /
@@ -56,9 +57,6 @@ getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
         #       is required by getBSseq(BSseq, type = "trans"); change if this
         #       is changed
         coef <- getBSseq(BSseq, type = "coef")
-        if (is(coef, "DelayedArray")) {
-            coef <- as.array(coef)
-        }
         meth <- getBSseq(BSseq, type = "trans")(coef)
         if(confint) {
             upper <- getBSseq(BSseq, type = "trans")(getBSseq(BSseq, type = "coef") +
