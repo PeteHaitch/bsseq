@@ -3,24 +3,19 @@
 #       the user switch to hdf5 nrow(BSseq) is large? If `hdf5 = TRUE` then
 #       each column of `stats` is in its own .h5 file; this reduces the
 #       memory usage of BSmooth.tstat() at the expense of some additional
-#       running time.#
+#       running time.
 # TODO: The real memory issue is that `allPs` (nrow = length(BSseq),
 #       ncol = number of samples) is also realised in memory during the
 #       function call; see TODO below.
 # NOTE: hdf5 = TRUE only affects output created by BSmooth.tstat(), i.e. the
 #       matrix-like object in the `stats` slot
+# TODO: The stats matrix *may* benefit from being stored as HDF5-backed matrix,
+#       but the saving is minor since this scales with nrow(BSseq) rather than
+#       ncol(BSseq); discuss with Kasper.
 BSmooth.tstat <- function(BSseq, group1, group2,
                           estimate.var = c("same", "paired", "group2"),
                           local.correct = TRUE, maxGap = NULL, qSd = 0.75,
                           k = 101, mc.cores = 1, verbose = TRUE, hdf5 = FALSE) {
-    smoothSd <- function(Sds, k) {
-        k0 <- floor(k/2)
-        if (all(is.na(Sds))) return(Sds)
-        thresSD <- pmax(Sds, quantile(Sds, qSd, na.rm = TRUE), na.rm = TRUE)
-        addSD <- rep(median(Sds, na.rm = TRUE), k0)
-        sSds <- as.vector(runmean(Rle(c(addSD, thresSD, addSD)), k = k))
-        sSds
-    }
     compute.correction <- function(idx, tstat, qSd = 0.75) {
         xx <- start(BSseq)[idx]
         yy <- tstat[idx]
@@ -90,11 +85,11 @@ BSmooth.tstat <- function(BSseq, group1, group2,
     allPs <- getMeth(BSseq, type = "smooth", what = "perBase",
                      confint = FALSE)
     if (is(allPs, "DelayedMatrix")) {
-        # TODO: Currently, need to realise `allPs` as an array since we use
-        #       matrixStats::rowSds(allPs) or matrixStats::rowVars(allPs); is
-        #       there a way to make these 'block processing friendly' to avoid
-        #       realising the entire thing in memory in one go? Remember,
-        #       dim(allPs) = dim(BSseq)!
+        # NOTE: Currently, need to realise allPs as an array since we use
+        #       matrixStats::rowSds(allPs) or matrixStats::rowVars(allPs);
+        # TODO: Need to make these matrixStats functions 'block processing
+        #       friendly' to avoid realising the entire thing in memory in one
+        #       go. Remember, dim(allPs) = dim(BSseq)!
         allPs <- as.array(allPs)
     }
     cn <- c("rawSds", "tstat.sd", "group2.means", "group1.means", "tstat")
@@ -107,8 +102,8 @@ BSmooth.tstat <- function(BSseq, group1, group2,
         group2.means <- HDF5Array(
             as.matrix(rowMeans(allPs[, group2, drop = FALSE], na.rm = TRUE)))
     } else {
-        # NOTE: Preallocate `stats` to avoid copies that would otherwise
-        #       occur when cbind()-ing vectors to form `stats`
+        # NOTE: Preallocate stats to avoid copies that would otherwise
+        #       occur when cbind()-ing vectors to form stats
         stats <- matrix(0, nrow = length(BSseq), ncol = length(cn),
                         dimnames = list(NULL, cn))
         stats[, "group1.means"] <- rowMeans(allPs[, group1, drop = FALSE],
@@ -122,8 +117,8 @@ BSmooth.tstat <- function(BSseq, group1, group2,
 
     if (verbose) cat("[BSmooth.tstat] computing stats across groups ... ")
     ptime1 <- proc.time()
-    # NOTE: rawSds is only realised on disk after running smoothSd()
-    #       because smoothSd() requires rawSds be realised in memory
+    # NOTE: rawSds is only realised on disk after running .smoothSd()
+    #       because .smoothSd() requires rawSds be realised in memory
     switch(estimate.var,
            "group2" = {
                if (hdf5) {
@@ -166,13 +161,13 @@ BSmooth.tstat <- function(BSseq, group1, group2,
     if (hdf5) {
         tstat.sd <- HDF5Array(
             as.matrix(do.call(c, mclapply(clusterIdx, function(idx) {
-            scale * smoothSd(rawSds[idx], k = k)
+            scale * .smoothSd(rawSds[idx], k = k, qSd = qSd)
         }, mc.cores = mc.cores))))
         rawSds <- HDF5Array(as.matrix(rawSds))
         tstat <- HDF5Array((group1.means - group2.means) / tstat.sd)
     } else {
         stats[, "tstat.sd"] <- do.call(c, mclapply(clusterIdx, function(idx) {
-            scale * smoothSd(stats[idx, "rawSds"], k = k)
+            scale * .smoothSd(stats[idx, "rawSds"], k = k, qSd = qSd)
         }, mc.cores = mc.cores))
         stats[, "tstat"] <- (stats[, "group1.means"] -
                                  stats[, "group2.means"]) / stats[, "tstat.sd"]
