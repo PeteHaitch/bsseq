@@ -91,7 +91,7 @@ if(require(bsseqData)) {
   BS.cancer.ex.fit.hdf5 <- BS.cancer.ex.fit[keepLoci.ex, ]
   assays(BS.cancer.ex.fit.hdf5) <- endoapply(assays(BS.cancer.ex.fit.hdf5),
                                              HDF5Array)
-  ## Remember to subset the BSseq object, see vignette for explanation
+  ## TODO: Need to update Bs.cancer.ex.fit to use `plogis` in `trans` slot
   BS.tstat.hdf5 <- BSmooth.tstat(BS.cancer.ex.fit.hdf5,
                                  group1 = c("C1", "C2", "C3"),
                                  group2 = c("N1", "N2", "N3"),

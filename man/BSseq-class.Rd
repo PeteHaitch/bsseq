@@ -183,6 +183,7 @@ M.hdf5 <- HDF5Array(M)
 BStest.hdf5 <- BSseq(pos = 1:3, chr = c("chr1", "chr2", "chr1"), M = M.hdf5,
                      Cov = M.hdf5 + 2)
 chrSelectBSseq(BStest.hdf5, seqnames = "chr1", order = TRUE)
-collapseBSseq(BStest.hdf5, columns = c("A1" = "A", "A2" = "A", "A3" = "B"))
+collapseBSseq(BStest.hdf5, columns = c("A1" = "A", "A2" = "A", "A3" = "B"),
+              hdf5 = TRUE)
 }
 \keyword{classes}
