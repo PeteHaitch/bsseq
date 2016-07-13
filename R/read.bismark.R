@@ -35,7 +35,6 @@ read.bismark <- function(files,
             cat(sprintf("[read.bismark] Reading file '%s' ... ", files[ii]))
         }
         ptime1 <- proc.time()
-        # UP TO HERE: Need to modify BSseq() to add `hdf5` argument
         if (fileType == "cov" || fileType == "oldBedGraph") {
             out <- read.bismarkCovRaw(thisfile = files[ii],
                                       thisSampleName = sampleNames[ii],
