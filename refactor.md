@@ -24,6 +24,10 @@ the result in memory and wrap the result in a _DelayedArray_ rather than to
 store all the seeds. It might be hard to know when to do this automatically, 
 but I think it should be an easy option for a developer/user to invoke. Here's 
 an illustration
+- You can a actually have a matrix, `x`, where 
+`length(x) > .Machine$integer.max`; the real limit is that 
+`nrow(x) <= .Machine$integer.max && ncol(x) <= .Machine$integer.max` must be 
+`TRUE`. Nonetheless, such a matrix is obviously going to be **huge** in memory.
 
 ```r
 x <- matrix(1:1000000)
@@ -266,28 +270,33 @@ a fair bit of work to implement in full generality.
 
 - [ ] `DelayedArray,vector` so I don't have to keep doing 
 `DelayedArray(as.matrix(x))`
+- [ ] `setHDF5DumpDir()` as well as `setHDF5DumpFile()`
 
 ## Files checked
 
-- [ ] `BSmooth.fstat.R`
-- [x] `BSmooth.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
-- [ ] `BSmooth.tstat.R`
-- [x] `BSseq_class.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
-- [ ] `BSseq_utils.R` (__UP TO HERE:__ See __TODO__)
-- [ ] `BSseqStat_class.R`
-- [x] `BSseqTstat_class.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
-- [x] `combine.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
-- [ ] `dmrFinder.R` (need to first update `BSseqStat_class.R`)
+- [x] `BSmooth.fstat.R`
+- [x] `BSmooth.R`
+- [x] `BSmooth.tstat.R`
+- [x] `BSseq_class.R`
+- [x] `BSseq_utils.R`
+- [x] `BSseqStat_class.R`
+- [x] `BSseqTstat_class.R`
+- [ ] `combine.R`
+- [x] `dmrFinder.R`
 - [x] `fisher.R`
-- [ ] `getStats.R` (need to first update `BSseqStat_class.R`)
-- [x] `gof_stats.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
-- [x] `hasGRanges.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
+- [x] `getStats.R`
+- [x] `gof_stats.R` 
+- [x] `hasGRanges.R`
 - [ ] `permutations.R`
-- [ ] `plotting.R`
-- [x] `read.bismark.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
-- [ ] `read.bsmooth.R` (started work, but low priority since rarely used interface. See __UP TO HERE__)
-- [x] `utils.R` (__TODO:__ Need to make use of _DelayedArray_ objects)
+- [x] `plotting.R`
+- [x] `read.bismark.R`
+- [x] `read.bsmooth.R`
+- [x] `utils.R`
 
 ## Misc. TODOs
 
 - [ ] `is()` vs. `inherits()` (motivated by [https://github.com/Bioconductor-mirror/BiocParallel/commit/420aeff4a222415908a4fd9028d907c473f42043](https://github.com/Bioconductor-mirror/BiocParallel/commit/420aeff4a222415908a4fd9028d907c473f42043))
+- [ ] Default value of hdf5? Currently FALSE to preserve previous behaviour, 
+      but an 'auto' option could be useful, e.g., if input uses HDF5 then so 
+      should output or if output is going to be big then use HDF5 (e.g., 
+      output of read.bismark())
