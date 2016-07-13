@@ -224,6 +224,16 @@ plotManyRegions <- function(BSseq, regions = NULL, extend = 0, main = "", addReg
     smoothPs <- getMeth(BSseq, type = "smooth")
     rawPs <- getMeth(BSseq, type = "raw")
     coverage <- getCoverage(BSseq)
+    # NOTE: Need to realise in memory the data to be plotted
+    if (is(smoothPs, "DelayedArray")) {
+        smoothPs <- as.array(smoothPs)
+    }
+    if (is(rawPs, "DelayedArray")) {
+        rawPs <- as.array(smoothPs)
+    }
+    if (is(coverage, "DelayedArray")) {
+        coverage <- as.array(smoothPs)
+    }
 
     ## get col, lwd, lty
     colEtc <- .bsGetCol(object = BSseq, col = col, lty = lty, lwd = lwd)
@@ -232,13 +242,14 @@ plotManyRegions <- function(BSseq, regions = NULL, extend = 0, main = "", addReg
     plot(positions[1], 0.5, type = "n", xaxt = "n", yaxt = "n",
          ylim = c(0,1), xlim = c(start(gr), end(gr)), xlab = "", ylab = "Methylation")
     axis(side = 2, at = c(0.2, 0.5, 0.8))
-    if(addTicks)
+    if (addTicks) {
         rug(positions)
+    }
 
     .bsHighlightRegions(regions = addRegions, gr = gr, ylim = c(0,1),
                         regionCol = regionCol, highlightMain = highlightMain)
 
-    if(addPoints) {
+    if (addPoints) {
         sapply(1:ncol(BSseq), function(sampIdx) {
             abline(v = positions[rawPs[, sampIdx] > 0.1], col = "grey80", lty = 1)
         })
@@ -250,7 +261,7 @@ plotManyRegions <- function(BSseq, regions = NULL, extend = 0, main = "", addReg
                      plotRange = c(start(gr), end(gr)))
     })
 
-    if(addPoints) {
+    if (addPoints) {
         sapply(1:ncol(BSseq), function(sampIdx) {
             .bsPlotPoints(positions, rawPs[, sampIdx], coverage[, sampIdx],
                           col = colEtc$col[sampIdx], pointsMinCov = pointsMinCov)
@@ -288,15 +299,21 @@ plotRegion <- function(BSseq, region = NULL, extend = 0, main = "", addRegions =
     if(!is.null(BSseqStat)) {
         BSseqStat <- subsetByOverlaps(BSseqStat, gr)
         if(is(BSseqStat, "BSseqTstat")) {
-            stat.values <- getStats(BSseqStat, what = stat)
+            stat.values <- getStats(BSseqStat)[, stat]
             stat.type <- "tstat"
         }
         if(is(BSseqStat, "BSseqStat")) {
             stat.type <- getStats(BSseqStat, what = "stat.type")
-            if(stat.type == "tstat")
+            if (stat.type == "tstat") {
                 stat.values <- getStats(BSseqStat, what = "stat")
-            if(stat.type == "fstat")
+            }
+            if (stat.type == "fstat") {
                 stat.values <- sqrt(getStats(BSseqStat, what = "stat"))
+            }
+        }
+        # NOTE: Need to realise in memory the data to be plotted
+        if (is(stat.values, "DelayedArray")) {
+            stat.values <- as.array(stat.values)
         }
         plot(start(gr), 0.5, type = "n", xaxt = "n", yaxt = "n",
              ylim = stat.ylim, xlim = c(start(gr), end(gr)), xlab = "", ylab = stat.type)
@@ -306,13 +323,15 @@ plotRegion <- function(BSseq, region = NULL, extend = 0, main = "", addRegions =
                      plotRange = c(start(gr), end(gr)))
     }
 
-    if(!is.null(annoTrack))
+    if (!is.null(annoTrack)) {
         plotAnnoTrack(gr, annoTrack, cex.anno)
+    }
 
-    if (!is.null(geneTrack))
+    if (!is.null(geneTrack)) {
         plotGeneTrack(gr, geneTrack, cex.gene)
+    }
 
-    if(!is.null(main)) {
+    if (!is.null(main)) {
         main <- .bsPlotTitle(gr = region, extend = extend, main = main,
                              mainWithWidth = mainWithWidth)
         mtext(side = 3, text = main, outer = TRUE, cex = 1)
