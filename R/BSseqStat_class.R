@@ -1,4 +1,11 @@
-setClass("BSseqStat", contains = "hasGRanges", 
+# NOTE: All elements of the list in the stats slot are now matrix-like (i.e.
+#       2-dimensional) instead of some being vector-like (i.e. 1-dimensional)
+# TODO: Perhaps the stats slot should be a matrixOrDelayedMatrix? The main
+#       complication is that the number of columns now depends on the number of
+#       coefficients whereas for the BSseqTstat the number of columns is fixed.
+#       I don't know that this buys us anything except consistency with
+#       BSseqTstat (and the change will require some code re-writing).
+setClass("BSseqStat", contains = "hasGRanges",
          representation(stats = "list",
                         parameters = "list")
          )
@@ -8,15 +15,11 @@ setValidity("BSseqStat", function(object) {
     if(is.null(names(object@stats)) || any(names(object@stats) == "") ||
        anyDuplicated(names(object@stats)))
         msg <- validMsg(msg, "the 'stats' list needs to be named with unique names.")
-    for(name in c("rawSds", "smoothsSds", "stat")) {
-        if(name %in% names(object@stats) && !is.vector(object@stats[[name]]))
-            msg <- validMsg(msg, sprintf("component '%s' of slot 'stats' have to be a vector", name))
-        if(name %in% names(object@stats) && length(object@stats[[name]]) != length(object@gr))
-            msg <- validMsg(msg, sprintf("component '%s' of slot 'stats' have to have the same length as slot 'gr'", name))
-    }
-    for(name in c("rawTstats")) {
-        if(name %in% names(object@stats) && !is.matrix(object@stats[[name]]))
-            msg <- validMsg(msg, sprintf("component '%s' of slot 'stats' have to be a matrix", name))
+    for(name in c("rawTstats", "rawSds", "smoothSds", "stat")) {
+        if(name %in% names(object@stats) &&
+           (!is.matrix(object@stats[[name]])) &&
+           !is(object@stats[[name]], "DelayedArray"))
+            msg <- validMsg(msg, sprintf("component '%s' of slot 'stats' have to be a matrix or a DelayedArray", name))
         if(name %in% names(object@stats) && nrow(object@stats[[name]]) != length(object@gr))
             msg <- validMsg(msg, sprintf("component '%s' of slot 'stats' have to have the same number of rows as slot 'gr' is long", name))
     }
@@ -42,13 +45,10 @@ setMethod("[", "BSseqStat", function(x, i, ...) {
     statnames <- names(x@stats)
     names(statnames) <- statnames
     x@stats <- lapply(statnames, function(nam) {
-        if(nam %in% c("rawTstats", "modelCoefficients")) {
-            stopifnot(is.matrix(x@stats[[nam]]))
-            return(x@stats[[nam]][i,,drop=FALSE])
-        }
-        if(nam %in% c("rawSds", "smoothSds", "stat")) {
-            stopifnot(is.vector(x@stats[[nam]]))
-            return(x@stats[[nam]][i])
+        if(nam %in% c("rawSds", "rawTstats", "modelCoefficients", "smoothSds", "stat")) {
+            stopifnot(is.matrix(x@stats[[nam]]) ||
+                          is(x@stats[[nam]], "DelayedArray"))
+            return(x@stats[[nam]][i, , drop = FALSE])
         }
         x@stats[[nam]]
     })
