@@ -1,7 +1,9 @@
-# TODO
+# DONE
+# NOTE: Modified to support HDF5-backed objects but untested
 read.umtab2 <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
                         readCycle = FALSE, keepFilt = FALSE,
-                        pattern = NULL, keepU, keepM, verbose = TRUE) {
+                        pattern = NULL, keepU, keepM, verbose = TRUE,
+                        hdf5 = FALSE) {
     filesPerDir <- lapply(dirs, function(xx) sort(list.files(xx, pattern = pattern, full.names = TRUE)))
     if(!all(sapply(filesPerDir, function(xx) all(basename(xx) == basename(filesPerDir[[1]])))))
         warning("'dirs' does not contain the exact same file names")
@@ -10,22 +12,22 @@ read.umtab2 <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
         chrRead <- read.umtab2.chr(sapply(filesPerDir, function(xx) xx[ii]),
                                    keepM = keepM, keepU = keepU, sampleNames = sampleNames,
                                    readCycle = readCycle, keepFilt = keepFilt,
-                                   verbose = verbose)
+                                   verbose = verbose, hdf5 = hdf5)
         if(rmZeroCov && length(chrRead) != 0){
             wh <- which(rowSums(chrRead$U + chrRead$M) > 0)
-            chrRead$M <- chrRead$M[wh,]
-            chrRead$U <- chrRead$U[wh,]
+            chrRead$M <- chrRead$M[wh, , drop = FALSE]
+            chrRead$U <- chrRead$U[wh, , drop = FALSE]
             if(readCycle) {
-                chrRead$Mcy <- chrRead$Mcy[wh,]
-                chrRead$Ucy <- chrRead$Ucy[wh,]
+                chrRead$Mcy <- chrRead$Mcy[wh, , drop = FALSE]
+                chrRead$Ucy <- chrRead$Ucy[wh, , drop = FALSE]
             }
             chrRead$chr <- chrRead$chr[wh]
             chrRead$pos <- chrRead$pos[wh]
             if(keepFilt) {
-                chrRead$filt_cycle <- chrRead$filt_cycle[wh,]
-                chrRead$filt_allele <- chrRead$filt_allele[wh,]
-                chrRead$filt_mapq <- chrRead$filt_mapq[wh,]
-                chrRead$filt_baseq <- chrRead$filt_baseq[wh,]
+                chrRead$filt_cycle <- chrRead$filt_cycle[wh, , drop = FALSE]
+                chrRead$filt_allele <- chrRead$filt_allele[wh, , drop = FALSE]
+                chrRead$filt_mapq <- chrRead$filt_mapq[wh, , drop = FALSE]
+                chrRead$filt_baseq <- chrRead$filt_baseq[wh, , drop = FALSE]
             }
         }
         allChrs[[ii]] <- chrRead
@@ -33,8 +35,11 @@ read.umtab2 <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
     }
     chr <- do.call(c, lapply(allChrs, function(xx) xx$chr))
     pos <- do.call(c, lapply(allChrs, function(xx) xx$pos))
-    M <- do.call(rbind, lapply(allChrs, function(xx) xx$M))
-    Cov <- do.call(rbind, lapply(allChrs, function(xx) xx$M)) +
+    i_M <- vapply(allChrs, function(xx) !is.null(xx$M), logical(1L))
+    i_U <- vapply(allChrs, function(xx) !is.null(xx$U), logical(1L))
+    stopifnot(identical(i_M, i_U))
+    M <- do.call(rbind, lapply(allChrs[i_M], function(xx) xx$M))
+    Cov <- do.call(rbind, lapply(allChrs[i_U], function(xx) xx$M)) +
         do.call(rbind, lapply(allChrs, function(xx) xx$U))
     if(readCycle) {
         Mcy <- do.call(rbind, lapply(allChrs, function(xx) xx$Mcy))
@@ -44,6 +49,19 @@ read.umtab2 <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
         Ucy <- NULL
     }
     if(keepFilt) {
+        # NOTE: Drop NULL elements because rbind,DelayedArray-method cannot
+        #       handle these
+        i_filt_cycle <- vapply(allChrs, function(xx) !is.null(xx$filt_cycle),
+                      logical(1L))
+        i_filt_allele <- vapply(allChrs, function(xx) !is.null(xx$filt_allele),
+                                logical(1L))
+        i_filt_mapq <- vapply(allChrs, function(xx) !is.null(xx$filt_mapq),
+                                logical(1L))
+        i_filt_baseq <- vapply(allChrs, function(xx) !is.null(xx$filt_baseq),
+                                logical(1L))
+        stopifnot(identical(i_filt_cycle, i_filt_allele) &&
+                      identical(i_filt_cycle, i_filt_mapq) &&
+                      identical(i_filt_cycle, i_filt_baseq))
         filt_cycle <- do.call(rbind, lapply(allChrs, function(xx) xx$filt_cycle))
         filt_allele <- do.call(rbind, lapply(allChrs, function(xx) xx$filt_allele))
         filt_mapq <- do.call(rbind, lapply(allChrs, function(xx) xx$filt_mapq))
@@ -62,13 +80,17 @@ read.umtab2 <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
                 Mcy = Mcy, Ucy = Ucy, csums = csums))
 }
 
-# TODO
+# DONE
+# NOTE: Modified to support HDF5-backed objects but untested
 read.umtab2.chr <- function(files, sampleNames = NULL,
                             keepM, keepU, readCycle = FALSE, keepFilt = FALSE,
-                            verbose = TRUE) {
+                            verbose = TRUE, hdf5 = FALSE) {
     columnHeaders <- strsplit(readLines(files[1], n = 1), "\t")[[1]]
-    if("strand" %in% columnHeaders)
+    if("strand" %in% columnHeaders) {
         stranded <- TRUE
+    } else {
+        stranded <- FALSE
+    }
     what0 <- replicate(length(columnHeaders), integer(0))
     names(what0) <- columnHeaders
     what0[["ref"]] <- character(0)
@@ -142,6 +164,18 @@ read.umtab2.chr <- function(files, sampleNames = NULL,
             filt_baseq[,ii] <- intab[["filt_baseq"]]
         }
     }
+    if (hdf5) {
+        M <- HDF5Array(M)
+        U <- HDF5Array(U)
+        Mcy <- HDF5Array(Mcy)
+        Ucy <- HDF5Array(Ucy)
+        if (keepFilt) {
+            filt_cycle <- HDF5Array(filt_cycle)
+            filt_allele <- HDF5Array(filt_allele)
+            filt_mapq <- HDF5Array(filt_mapq)
+            filt_baseq <- HDF5Array(filt_baseq)
+        }
+    }
     return(list(chr = chr, pos = pos, M = M, U = U,
                 Mcy = Mcy, Ucy = Ucy,
                 filt_cycle = filt_cycle, filt_allele = filt_allele,
@@ -149,18 +183,21 @@ read.umtab2.chr <- function(files, sampleNames = NULL,
                 csums = csums))
 }
 
-# TODO
+# NOTE: Does not currently support HDF5-backed objects
 read.umtab2.chr2 <- function(files, sampleNames = NULL,
                              keepM, keepU, verbose = TRUE) {
     columnHeaders <- strsplit(readLines(files[1], n = 1), "\t")[[1]]
-    if("strand" %in% columnHeaders)
+    if("strand" %in% columnHeaders) {
         stranded <- TRUE
+    } else {
+        stranded <- FALSE
+    }
     what0 <- replicate(length(columnHeaders), integer(0))
     names(what0) <- columnHeaders
     what0[["ref"]] <- character(0)
     if(stranded)
         what0[["strand"]] <- character(0)
-    if(verbose) cat("[read.umtab2.chr] parsing all samples first\n")
+    if(verbose) cat("[read.umtab2.chr2] parsing all samples first\n")
     scanPars <- list(sep = "", quote = "", quiet = TRUE, skip = 1,
                      what = what0, na.strings = c("NA", "?"))
     ## First we get the locations of everything in all files
@@ -236,7 +273,7 @@ read.umtab2.chr2 <- function(files, sampleNames = NULL,
 }
 
 
-# WIP
+# DONE
 read.umtab <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
                        pattern = NULL,
                        keepU = c("U10", "U20", "U30", "U40"),
@@ -253,8 +290,8 @@ read.umtab <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
                                   verbose = verbose, hdf5 = hdf5)
         if(rmZeroCov && length(chrRead) != 0){
             wh <- which(rowSums(chrRead$U + chrRead$M) > 0)
-            chrRead$M <- chrRead$M[wh,]
-            chrRead$U <- chrRead$U[wh,]
+            chrRead$M <- chrRead$M[wh, , drop = FALSE]
+            chrRead$U <- chrRead$U[wh, , drop = FALSE]
             chrRead$Mcy <- chrRead$Mcy[wh,]
             chrRead$Ucy <- chrRead$Ucy[wh,]
             chrRead$chr <- chrRead$chr[wh]
@@ -265,15 +302,18 @@ read.umtab <- function(dirs, sampleNames = NULL, rmZeroCov = FALSE,
         allChrs[[ii]] <- chrRead
     }
 
-    # UP TO HERE: Need HDF5Array-specific logic. rbind,DelayedArray-method
-    #             fails if any arguments are NULL. Also, want to realise M and
-    #             Cov as *new* HDF5-backed objects
+    # NOTE: Drop NULL elements because rbind,DelayedArray-method cannot
+    #       handle these
+    i_M <- vapply(allChrs, function(xx) !is.null(xx$M), logical(1L))
+    i_U <- vapply(allChrs, function(xx) !is.null(xx$U), logical(1L))
+    stopifnot(identical(i_M, i_U))
     BSdata <- BSseq(chr = do.call(c, lapply(allChrs, function(xx) xx$chr)),
                     pos = do.call(c, lapply(allChrs, function(xx) xx$pos)),
-                    M = do.call(rbind, lapply(allChrs, function(xx) xx$M)),
-                    Cov = do.call(rbind, lapply(allChrs, function(xx) xx$M)) +
-                    do.call(rbind, lapply(allChrs, function(xx) xx$U)),
-                    rmZeroCov = rmZeroCov)
+                    M = do.call(rbind, lapply(allChrs[i_M], function(xx) xx$M)),
+                    Cov = do.call(rbind, lapply(allChrs[i_M], function(xx) xx$M)) +
+                        do.call(rbind, lapply(allChrs[i_U], function(xx) xx$U)),
+                    rmZeroCov = rmZeroCov,
+                    hdf5 = hdf5)
     GC <- do.call(c, lapply(allChrs, function(xx) xx$GC))
     Map <- do.call(c, lapply(allChrs, function(xx) xx$Map))
     Mcy <- do.call(rbind, lapply(allChrs, function(xx) xx$Mcy))
@@ -328,7 +368,7 @@ read.umtab.chr <- function(files, sampleNames = NULL,
     Ucy[,1] <- intab[["Ucy"]]
     csums[,1] <- as.integer(sapply(intab[c(allMnames, allUnames)], sum))
     for(ii in seq_along(files[-1]) + 1) {
-        if(verbose) cat("[read.umtab2] reading", files[ii], "\n")
+        if(verbose) cat("[read.umtab.chr] reading", files[ii], "\n")
         intab <- do.call(scan, c(scanPars, file = files[ii]))
         if(length(intab[[1]]) == 0)
             next
@@ -349,7 +389,7 @@ read.umtab.chr <- function(files, sampleNames = NULL,
                 Mcy = Mcy, Ucy = Ucy, csums = csums))
 }
 
-# TODO
+# NOTE: Does not currently support HDF5-backed objects
 read.bsmoothDirRaw <- function(dir, seqnames = NULL, keepCycle = FALSE, keepFilt = FALSE,
                                header = TRUE, verbose = TRUE) {
     dir <- normalizePath(dir)
@@ -416,7 +456,7 @@ read.bsmoothDirRaw <- function(dir, seqnames = NULL, keepCycle = FALSE, keepFilt
     gr
 }
 
-# TODO
+# NOTE: Does not currently support HDF5-backed objects
 sampleRawToBSseq <- function(gr, qualityCutoff = 20, sampleName = NULL, rmZeroCov = FALSE) {
     numberQualsGreaterThan <- function(cvec) {
         onestring <- paste(cvec, collapse = "")
@@ -437,7 +477,7 @@ sampleRawToBSseq <- function(gr, qualityCutoff = 20, sampleName = NULL, rmZeroCo
     BSseq(gr = gr, M = M, Cov = Cov, sampleNames = sampleName, rmZeroCov = rmZeroCov)
 }
 
-# TODO
+# NOTE: Does not currently support HDF5-backed objects
 read.bsmooth <- function(dirs, sampleNames = NULL, seqnames = NULL, returnRaw = FALSE,
                          qualityCutoff = 20, rmZeroCov = FALSE, verbose = TRUE) {
     dirs <- normalizePath(dirs, mustWork = TRUE)
@@ -480,7 +520,7 @@ read.bsmooth <- function(dirs, sampleNames = NULL, seqnames = NULL, returnRaw = 
     allOut
 }
 
-# TODO
+# NOTE: Does not currently support HDF5-backed objects
 parsingPipeline <- function(dirs, qualityCutoff = 20, outDir, seqnames = NULL,
                             subdir = "ev_bt2_cpg_tab", timing = FALSE) {
     if(!all(file.exists(dirs)))
