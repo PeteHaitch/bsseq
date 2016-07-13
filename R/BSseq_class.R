@@ -97,12 +97,13 @@ getBSseq <- function(BSseq, type = c("Cov", "M", "gr", "coef", "se.coef", "trans
 
 }
 
-# NOTE: No `hdf5` argument. If the user wants a HDF5Matrix or DelayedMatrix
-#       then `M` and `Cov` should already be in this format.
+# NOTE: hdf5 = FALSE only has effect if [M|Cov|coef|se.coef] is not already a
+#       HDF5Matrix object, i.e. it will never realise a HDF5Matrix as an
+#       array/matrix
 BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
                   trans = NULL, parameters = NULL, pData = NULL,
                   gr = NULL, pos = NULL, chr = NULL, sampleNames = NULL,
-                  rmZeroCov = FALSE) {
+                  rmZeroCov = FALSE, hdf5 = FALSE) {
     if(is.null(gr)) {
         if(is.null(pos) || is.null(chr))
             stop("Need pos and chr")
@@ -114,10 +115,17 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         stop("'gr' needs to have widths of 1")
     if(is.null(M) || is.null(Cov))
         stop("Need M and Cov")
-    if(!is.matrix(M) && !is(M, "HDF5Matrix") && !is(M, "DelayedMatrix"))
-        stop("'M' needs to be a matrix or HDF5Matrix or DelayedMatrix")
-    if(!is.matrix(Cov) && !is(Cov, "HDF5Matrix") && !is(Cov, "DelayedMatrix"))
-        stop("'Cov' needs to be a matrix or HDF5Matrix or DelayedMatrix")
+    if(!is.matrix(M) && !is(M, "DelayedMatrix"))
+        stop("'M' needs to be a matrix or DelayedMatrix")
+    if(!is.matrix(Cov) && !is(Cov, "DelayedMatrix"))
+        stop("'Cov' needs to be a matrix or DelayedMatrix")
+    if (!hdf5 &&
+        any(is(M, "HDF5Matrix"), is(Cov, "HDF5Matrix"),
+            is(coef, "HDF5Matrix"), is(se.coef, "HDF5Matrix"))) {
+        stop("'hdf5 = FALSE' but [M|Cov|coef|se.coef] is a HDF5Matrix.\n",
+             "Are you sure you want to realise [M|Cov|coef|se.coef] in memory? ",
+             "If so, first call 'as.array()' on the relevant object(s).")
+    }
     if(length(gr) != nrow(M) ||
        length(gr) != nrow(Cov) ||
        ncol(Cov) != ncol(M))
@@ -149,47 +157,58 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         wh <- which(rowSums(Cov) == 0)
         if(length(wh) > 0) {
             gr <- gr[-wh]
-            M <- M[-wh,,drop = FALSE]
-            Cov <- Cov[-wh,,drop = FALSE]
+            M <- M[-wh, ,drop = FALSE]
+            Cov <- Cov[-wh, ,drop = FALSE]
         }
     }
     grR <- reduce(gr, min.gapwidth = 0L)
     if(!identical(grR, gr)) {
         ## Now we either need to re-order or collapse or both
         mm <- as.matrix(findOverlaps(grR, gr))
-        mm <- mm[order(mm[,1]),]
+        mm <- mm[order(mm[, 1]), ]
         if(length(grR) == length(gr)) {
             ## only re-ordering is necessary
             gr <- grR
-            M <- M[mm[,2],,drop = FALSE]
-            Cov <- Cov[mm[,2],,drop = FALSE]
+            M <- M[mm[, 2], , drop = FALSE]
+            Cov <- Cov[mm[, 2], , drop = FALSE]
             if(!is.null(coef))
-                coef <- coef[mm[,2],,drop = FALSE]
+                coef <- coef[mm[, 2], ,drop = FALSE]
             if(!is.null(se.coef))
-                se.coef <- se.coef[mm[,2],, drop = FALSE]
+                se.coef <- se.coef[mm[, 2], , drop = FALSE]
         } else {
             warning("multiple positions, collapsing BSseq object\n")
             if(!is.null(coef) || !is.null(se.coef))
                 stop("Cannot collapse when 'coef' or 'se.coef' are present")
             gr <- grR
-            sp <- split(mm[,2], mm[,1])[as.character(1:length(grR))]
+            sp <- split(mm[, 2], mm[, 1])[as.character(1:length(grR))]
             names(sp) <- NULL
-            # NOTE: colSums(DelayedMatrix) returns a matrix, but want to
-            #       preserve M and Cov as DelayedMatrix/HDF5Matrix if that's
-            #       what these were
-            M_class <- class(M)
-            M <- do.call(rbind, lapply(sp, function(ii) {
-                colSums(M[ii,, drop = FALSE])
-            }))
-            if (M_class %in% c("DelayedMatrix", "HDF5Matrix")) {
-                M <- HDF5Array(M)
+            # NOTE: Special case for DelayedMatrix (really targetting
+            #       HDF5Matrix but generally applicable) since we don't want to
+            #       realise the intermediate colSums in memory but want to
+            #       register them as delayed operations
+            if (is.matrix(M)) {
+                M <- do.call(rbind, lapply(sp, function(i) {
+                    colSums(M[i, , drop = FALSE])
+                }))
+            } else if (is(M, "DelayedMatrix")) {
+                M <- do.call(rbind, lapply(sp, function(i) {
+                    # NOTE: The Reduce(...) is equivalent to
+                    #       colSums(M[i, , drop = FALSE]) but does it using a
+                    #       delayed operation and always returns a 1 x ncol(M)
+                    #       DelayedMatrix
+                    # TODO: A 'delayed colSums' function/method might be
+                    #       of general use
+                    Reduce(`+`, lapply(i, function(ii) M[ii, , drop = FALSE]))
+                }))
             }
-            Cov_class <- class(Cov)
-            Cov <- do.call(rbind, lapply(sp, function(ii) {
-                colSums(Cov[ii,, drop = FALSE])
-            }))
-            if (Cov_class %in% c("DelayedMatrix", "HDF5Matrix")) {
-                Cov <- HDF5Array(Cov)
+            if (is.matrix(Cov)) {
+                Cov <- do.call(rbind, lapply(sp, function(i) {
+                    colSums(Cov[i, , drop = FALSE])
+                }))
+            } else if (is(Cov, "DelayedMatrix")) {
+                Cov <- do.call(rbind, lapply(sp, function(i) {
+                    Reduce(`+`, lapply(i, function(ii) Cov[ii, , drop = FALSE]))
+                }))
             }
         }
     }
@@ -217,8 +236,16 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         if(!is.null(rownames(se.coef)))
             rownames(se.coef) <- NULL
     }
-    # TODO: May need to realise `M`, `Cov`, `coef`, and `se.coef` using
-    #       HDF5Dataset() at this point
+    if (hdf5) {
+        M <- HDF5Array(M)
+        Cov <- HDF5Array(Cov)
+        if (!is.null(coef)) {
+            coef <- HDF5Array(coef)
+        }
+        if (!is.null(se.coef)) {
+            se.coef <- HDF5Array(coef)
+        }
+    }
     assays <- SimpleList(M = M, Cov = Cov, coef = coef, se.coef = se.coef)
     assays <- assays[!sapply(assays, is.null)]
     if(is.null(pData) || all(dim(pData) == c(0,0)))
