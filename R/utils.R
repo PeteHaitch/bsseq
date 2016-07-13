@@ -47,7 +47,9 @@ setMethod("assayNames", "BSseq",
               names(x@assays$field("data"))
           })
 # stats::plogis() generalised to handle DelayedArray input
-# TODO: Could make into a method if that simplifies dispatch
+# TODO: Herve has added plogis to HDF5Array, but needs a version bump to
+#       propagate to the build system
+#       Once working, remove this hack
 .plogis <- function(x) {
     # TODO: Have asked Hervé what is the correct way to register a delayed
     # op, i.e. is there an officially supported (and exported) method?
@@ -57,4 +59,27 @@ setMethod("assayNames", "BSseq",
         y <- plogis(x)
     }
     y
+}
+
+# NOTE: This used to be defined in both BSmooth.tstat() and smoothSds(); pulled
+#       out to avoid code duplication and renamed to indicate this is an
+#       internal helper function
+#' Smooth standard deviations using a running mean
+#'
+#' @param Sds A vector or column matrix (not checked) of standard deviations
+#' to be smoothed
+#' @param k The window size used by runmean()
+#' @param qSd The quantile to be used in thresholding the standard deviations
+#'
+#' @note This is really a general running mean smoother but is named with
+#' 'standard deviation' because that is what it is used on in bsseq
+#'
+#' @return A vector of length equal to the length of the Sds
+.smoothSd <- function(Sds, k, qSd) {
+    k0 <- floor(k/2)
+    if(all(is.na(Sds))) return(Sds)
+    thresSD <- pmax(Sds, quantile(Sds, qSd, na.rm = TRUE), na.rm = TRUE)
+    addSD <- rep(median(Sds, na.rm = TRUE), k0)
+    sSds <- as.vector(runmean(Rle(c(addSD, thresSD, addSD)), k = k))
+    sSds
 }
