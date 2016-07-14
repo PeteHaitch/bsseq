@@ -291,11 +291,17 @@ a fair bit of work to implement in full generality.
 - [x] `getStats.R`
 - [x] `gof_stats.R` 
 - [x] `hasGRanges.R`
-- [ ] `permutations.R`
+- [x] `permutations.R`
 - [x] `plotting.R`
 - [x] `read.bismark.R`
 - [x] `read.bsmooth.R`
 - [x] `utils.R`
+
+__All files checked for compatability issues with HDF5Array-backed BSseq objects.__ 
+Many patches were added and in some places the code much simplified. However, 
+there remain a number of __TODO__s, some of these are code optimisations, 
+others are design decisions I need to discuss with Kasper. I also really want 
+to add more unit tests to BSseq.
 
 ## Misc. TODOs
 

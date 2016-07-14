@@ -1,3 +1,7 @@
+# TODO: Simplify to use logic from F-stat permutation scheme also for T-stat.
+#       Aim is to reduce all the hardcoded special cases and hopefully provide
+#       a unified permutation interface.
+
 getNullDistribution_BSmooth.tstat <- function(BSseq, idxMatrix1, idxMatrix2,
                                               estimate.var, local.correct,
                                               cutoff, stat, maxGap, mc.cores = 1) {

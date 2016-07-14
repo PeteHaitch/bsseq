@@ -192,7 +192,6 @@ fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
                                                   mc.cores = mc.cores)
     fwer <- getFWER.fstat(null = c(list(dmrs), nullDist), type = "dmrs")
     dmrs$fwer <- fwer
-    # UP TO HERE: Need to optimise getMeth for the DelayedArray case
     meth <- getMeth(BSseq, regions = dmrs, what = "perRegion")
     meth <- t(apply(meth, 1, function(xx) tapply(xx, fac, mean)))
     dmrs <- cbind(dmrs, meth)
