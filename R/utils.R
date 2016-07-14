@@ -83,3 +83,92 @@ setMethod("assayNames", "BSseq",
     sSds <- as.vector(runmean(Rle(c(addSD, thresSD, addSD)), k = k))
     sSds
 }
+
+# Internal helper used by .combineMatrixLike (TODO: and .combineListMatrixList?)
+# While designed for DelayedMatrix objects, it will also work for matrix
+# objects (although it is not the most efficient way to do so in this case
+# since it (A) cbinds() vectors to form the final matrix-like object, and
+# (B) returns a HDF5-backed DelayedMatrix object rather than a matrix object)
+.combineDelayedMatrix <- function(m, idx, nrow, fill) {
+    # TODO: Could consider using mclapply(), but (A) is it worth it? and
+    #       (B) would need to be careful in case .combineMatrixList() is
+    #       iteself called from a function using mclapply().
+    M <- lapply(seq_len(ncol(m)), function(j) {
+        mm <- matrix(fill, nrow = nrow, ncol = 1L)
+        mm[idx, 1L] <- as.array(m[, j, drop = FALSE])
+        HDF5Array(mm)
+    })
+    if (length(M) > 1) {
+        M <- do.call(cbind, M)
+    } else {
+        M <- M[[1]]
+    }
+    M
+}
+
+#' Combine two matrix-like objects
+#'
+#' A helper function used by combine (TODO: And combineList?).
+#' Combines two matrix-like objects (x, y) into a new matrix-like object with
+#' given dimensions (nrow, nccol) by merging according to row indices
+#' (idx_x, idx_y) with columns of x to the left of columns of y.
+#' The matrix-like object can be a matrix or a DelayedMatrix (from HDF5Array
+#' package). The return value is a matrix if both x and y are' matrix objects
+#' (i.e. realised in memory), and is otherwise a HDF5Array object (i.e.
+#' realised on disk) [note that this means that if the x or y is a
+#' DelayedMatrix with an in-memory @seed the result is still written to disk as
+#' a HDF5-backed DelayedMatrix].
+#' @param x,y A matrix-like object
+#' @param idx_x,idx_y A vector of row indices for elements of x (resp. y) in
+#' the returned matrix-like object
+#' @param nrow,ncol The dimensions of the returned matrix-like object
+#' @param fill The value to be used for filling in elements of the returned
+#' matrix-like object where a row is not found in one of x or y
+.combineMatrixLike <- function(x, y, idx_x, idx_y, nrow, ncol, fill = 0L) {
+    if (is.matrix(x) && is.matrix(y)) {
+        z <- matrix(fill, nrow = nrow, ncol = ncol)
+        z[idx_x, seq_len(ncol(x))] <- x
+        z[idx_y, ncol(x) + seq_len(ncol(y))] <- y
+    } else if (is(x, "DelayedMatrix") || is(y, "DelayedMatrix")) {
+        # NOTE: The strategy for combining x and y when one or both is a
+        #       DelayedMatrix object is designed to avoid realising in memory
+        #       either object in its entirety at any one time. Instead, we
+        #       realise columns of x and y, perform the combine, write the
+        #       combined column to disk, and finally cbind() these columns and
+        #       write as a new HDF5Matrix.
+        z_x <- .combineDelayedMatrix(x, idx_x, nrow, fill)
+        z_y <- .combineDelayedMatrix(y, idx_y, nrow, fill)
+        # NOTE: z is a DelayedMatrix with two HDF5-backed seeds
+        z <- cbind(z_x, z_y)
+
+    } else {
+        stop("Cannot combine objects with classes '", class(x),
+             "' and '", class(y), "'")
+    }
+    z
+}
+
+.combineListMatrixLike <- function(matrix_list, idx_list, nrow, ncol,
+                                   fill = NA_real_, hdf5 = FALSE) {
+    cl <- vapply(matrix_list, class, character(1L))
+    if (all(cl == "matrix") && !hdf5) {
+        z <- matrix(fill, nrow, ncol)
+        j0 <- 0
+        for (j in seq_along(matrix_list)) {
+            i <- idx_list[[j]]
+            jj <- j0 + seq_len(ncol(matrix_list[[j]]))
+            z[i, jj] <- matrix_list[[j]]
+            j0 <- j0 + ncol(matrix_list[[j]])
+        }
+        if (hdf5) {
+            z <- HDF5Array(z)
+        }
+    } else if (any(cl == "DelayedMatrix") || hdf5) {
+        z <- do.call(cbind, mapply(function(m, idx) {
+            .combineDelayedMatrix(m, idx, nrow, fill)
+        }, m = matrix_list, idx = idx_list))
+    } else {
+        stop("Cannot combine list of objects with classes: ", paste0(cl, sep = ", "))
+    }
+    z
+}

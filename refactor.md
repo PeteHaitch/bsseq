@@ -147,6 +147,10 @@ pryr::object_size(e3)
 but rather uses '`base::rowSums() / ncol()`'?
 - [ ] How to make function, e.g., `matrixStats::rowVars()`, 'block processing 
 friendly'?
+- [ ] What should the behaviour of `cbind()`, `rbind()`, `combine()`, 
+`arbind()`, `acbind()` be if some of inputs are array objects and some are 
+DelayedArray objects? E.g., when combining SummarizedExperiment objects where 
+some have their assays in memory and others have their assays on disk.
 
 ## Missing methods
 
@@ -281,7 +285,7 @@ a fair bit of work to implement in full generality.
 - [x] `BSseq_utils.R`
 - [x] `BSseqStat_class.R`
 - [x] `BSseqTstat_class.R`
-- [ ] `combine.R`
+- [x] `combine.R`
 - [x] `dmrFinder.R`
 - [x] `fisher.R`
 - [x] `getStats.R`
