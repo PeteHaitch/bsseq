@@ -69,6 +69,8 @@ BS.fit
 library(HDF5Array)
 BS.chr22.hdf5 <- BS.chr22
 assays(BS.chr22.hdf5) <- endoapply(assays(BS.chr22), HDF5Array)
+# TODO: Perhaps BS.chr22.hdf5 should be an included dataset in bsseq rather
+#       than constructing it (which is kind of opaque)
 BS.fit.hdf5 <- BSmooth(BS.chr22.hdf5, verbose = TRUE, hdf5 = TRUE)
 BS.fit.hdf5
 }

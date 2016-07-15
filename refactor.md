@@ -306,7 +306,14 @@ to add more unit tests to BSseq.
 ## Misc. TODOs
 
 - [ ] `is()` vs. `inherits()` (motivated by [https://github.com/Bioconductor-mirror/BiocParallel/commit/420aeff4a222415908a4fd9028d907c473f42043](https://github.com/Bioconductor-mirror/BiocParallel/commit/420aeff4a222415908a4fd9028d907c473f42043))
+    - [ ] Relatedly, should I be checking for _HDF5[Array|Matrix]_ or 
+         _DelayedArray[Array|Matrix]_?
 - [ ] Default value of hdf5? Currently FALSE to preserve previous behaviour, 
       but an 'auto' option could be useful, e.g., if input uses HDF5 then so 
       should output or if output is going to be big then use HDF5 (e.g., 
       output of read.bismark())
+- [ ] Should bsseq DEPEND on HDF5Array so that HDF5Array is automatically added 
+      to the search path?
+    - [ ] Relatedly, `library(HDF5Array)` or `require(HDF5Array)` or something 
+          else when using HDF5Array in examples.
+- [ ] FWER of DMRs sounds like it could be candidate for optimisation
