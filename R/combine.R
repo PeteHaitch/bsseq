@@ -184,7 +184,8 @@ combineList <- function(x, ..., hdf5 = FALSE) {
     sameGr <- sapply(x[-1], function(xx) {
         identical(gr, getBSseq(xx, "gr"))
     })
-    if (length(Reduce(intersect, lapply(x, sampleNames))) != 0L) {
+    if (length(sampleNames) > 1 &&
+        length(Reduce(intersect, lapply(x, sampleNames))) != 0L) {
         stop("sampleNames of inputs must not overlap")
     }
     if (all(sameGr)) {

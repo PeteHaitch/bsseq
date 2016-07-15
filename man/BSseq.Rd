@@ -73,10 +73,11 @@ BSseq(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
   M.hdf5 <- HDF5Array(M)
   Cov.hdf5 <- HDF5Array(Cov)
   BS1.hdf5 <- BSseq(chr = c("chr1", "chr2", "chr1"), pos = c(1, 2, 3),
-                    M = M.hdf5, Cov = Cov.hdf5, sampleNames = c("A", "B", "C"))
+                    M = M.hdf5, Cov = Cov.hdf5, sampleNames = c("A", "B", "C"),
+                    hdf5 = TRUE)
   BS1.hdf5
   BS2.hdf5 <- BSseq(chr = c("chr1", "chr1", "chr1"), pos = c(1, 1, 1),
-                    M = M.hdf5, Cov = Cov.hdf5, sampleNames = c("A", "B", "C"))
+                    M = M.hdf5, Cov = Cov.hdf5, sampleNames = c("A", "B", "C"),
+                    hdf5 = TRUE)
   BS2.hdf5
-
 }

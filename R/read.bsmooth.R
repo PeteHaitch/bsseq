@@ -512,7 +512,7 @@ read.bsmooth <- function(dirs, sampleNames = NULL, seqnames = NULL, returnRaw = 
     if(!returnRaw) {
         if(verbose) cat(sprintf("[read.bsmooth] Joining samples ... "))
         ptime1 <- proc.time()
-        allOut <- combineList(allOut, hdf5 = hdf5)
+        allOut <- combineList(allOut)
         ptime2 <- proc.time()
         stime <- (ptime2 - ptime1)[3]
         if(verbose) cat(sprintf("done in %.1f secs\n", stime))
