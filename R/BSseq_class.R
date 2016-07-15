@@ -42,8 +42,8 @@ setMethod("pData", "BSseq", function(object) {
 
 setReplaceMethod("pData",
                  signature = signature(
-                      object = "BSseq",
-                      value = "data.frame"),
+                     object = "BSseq",
+                     value = "data.frame"),
                  function(object, value) {
                      colData(object) <- as(value, "DataFrame")
                      object
@@ -51,8 +51,8 @@ setReplaceMethod("pData",
 
 setReplaceMethod("pData",
                  signature = signature(
-                      object = "BSseq",
-                      value = "DataFrame"),
+                     object = "BSseq",
+                     value = "DataFrame"),
                  function(object, value) {
                      colData(object) <- value
                      object
@@ -87,7 +87,7 @@ getBSseq <- function(BSseq, type = c("Cov", "M", "gr", "coef", "se.coef", "trans
     if(type %in% c("coef", "se.coef") && type %in% assayNames(BSseq))
         return(assay(BSseq, type))
     if(type %in% c("coef", "se.coef"))
-       return(NULL)
+        return(NULL)
     if(type == "trans")
         return(BSseq@trans)
     if(type == "parameters")
@@ -100,6 +100,8 @@ getBSseq <- function(BSseq, type = c("Cov", "M", "gr", "coef", "se.coef", "trans
 # NOTE: hdf5 = FALSE only has effect if [M|Cov|coef|se.coef] is not already a
 #       HDF5Matrix object, i.e. it will never realise a HDF5Matrix as an
 #       array/matrix
+# TODO: If the user forgets to set hdf5 = TRUE then BSseq() errors when any of
+#       the matrix-like objects are HDF5Matrix
 BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
                   trans = NULL, parameters = NULL, pData = NULL,
                   gr = NULL, pos = NULL, chr = NULL, sampleNames = NULL,
@@ -262,24 +264,36 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
 
 # TODO: Include helper function to update matrix-based BSseq object to a
 #       HDF5matrix-based object?
+# TODO: Is this expensive (i.e. does it unnecessarily copy certain slots when
+#       all that really needs to be done for a recent BSseq object is update
+#       the trans slot)
 setMethod("updateObject", "BSseq",
           function(object, ...) {
-              # NOTE: Need to update trans slot of existing BSseq objects
-              #       because of proposed change to default definition of trans
-              #       returned by BSmooth().
-              if(.hasSlot(object, "trans")) {
-                  object@trans <- .plogis
+              if (.hasSlot(object, "trans")) {
+                  .old_trans <- function(x) {
+                      y <- x
+                      ix <- which(x < 0)
+                      ix2 <- which(x > 0)
+                      y[ix] <- exp(x[ix])/(1 + exp(x[ix]))
+                      y[ix2] <- 1/(1 + exp(-x[ix2]))
+                      y
+                  }
+                  # TODO: identical() is too strong, but is all.equal() correct?
+                  if (isTRUE(all.equal(getBSseq(object, "trans"), .old_trans))) {
+                      object@trans <- plogis
+                  }
               }
-               if(.hasSlot(object, "assays")) {
-                   # call method for RangedSummarizedExperiment objects
-                   callNextMethod()
-               } else {
-                   BSseq(gr = object@gr, M = object@M, Cov = object@Cov,
-                         coef = object@coef, se.coef = object@se.coef,
-                         trans = object@trans, parameters = object@parameters,
-                         pData = object@phenoData@data)
-               }
-           })
+              if (.hasSlot(object, "assays")) {
+                  # call method for RangedSummarizedExperiment objects
+                  callNextMethod()
+              } else {
+                  BSseq(gr = object@gr, M = object@M, Cov = object@Cov,
+                        coef = object@coef, se.coef = object@se.coef,
+                        trans = object@trans, parameters = object@parameters,
+                        pData = object@phenoData@data)
+              }
+          }
+)
 
 
 strandCollapse <- function(BSseq, shift = TRUE) {

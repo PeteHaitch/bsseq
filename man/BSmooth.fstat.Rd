@@ -66,7 +66,6 @@ BSmooth.fstat(BSseq, design, contrasts, verbose = TRUE)
         BS.cancer.ex.fit.hdf5 <- BS.cancer.ex.fit[keepLoci.ex, ]
         assays(BS.cancer.ex.fit.hdf5) <- endoapply(assays(BS.cancer.ex.fit.hdf5),
                                                    HDF5Array)
-        ## TODO: Need to update Bs.cancer.ex.fit to use `plogis` in `trans` slot
         BS.stat.hdf5 <- BSmooth.fstat(BS.cancer.ex.fit.hdf5, design, contrasts,
                                       hdf5 = TRUE)
         BS.stat.hdf5

@@ -169,7 +169,8 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
     # NOTE: The commented out version of mytrans() is equivalent to the new one.
     #       However, the new version is approximately 2x as fast and uses less
     #       memory since there is no need to create the index vectors `ix` and
-    #       `ix2`. Moreover, it's  easy to register plogis() as a delayed op.
+    #       `ix2`. Moreover, there is now a plogis,DelayedArray-method in
+    #       HDF5Array
     # mytrans <- function(x) {
     #     y <- x
     #     # TODO: If can't use plogis(), then use x[x < 0] and x[x > 0] instead
@@ -182,9 +183,9 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
     #     y[ix2] <- 1/(1 + exp(-x[ix2]))
     #     y
     # }
-    # TODO: This will require that existing BSseq objects are update using
-    #       (an updated) updateObject()
-    mytrans <- .plogis
+    # TODO: This will require that all existing BSseq objects are updated using
+    #       the new updateObject()
+    mytrans <- plogis
     environment(mytrans) <- baseenv()
     BSseq@trans <- mytrans
     parameters <- list(smoothText = sprintf("BSmooth (ns = %d, h = %d, maxGap = %d)", ns, h, maxGap),

@@ -46,20 +46,6 @@ setMethod("assayNames", "BSseq",
           function(x, ...) {
               names(x@assays$field("data"))
           })
-# stats::plogis() generalised to handle DelayedArray input
-# TODO: Herve has added plogis to HDF5Array, but needs a version bump to
-#       propagate to the build system
-#       Once working, remove this hack
-.plogis <- function(x) {
-    # TODO: Have asked Hervé what is the correct way to register a delayed
-    # op, i.e. is there an officially supported (and exported) method?
-    if (is(x, "DelayedArray")) {
-        y <- HDF5Array:::register_delayed_op(x, plogis)
-    } else {
-        y <- plogis(x)
-    }
-    y
-}
 
 # NOTE: This used to be defined in both BSmooth.tstat() and smoothSds(); pulled
 #       out to avoid code duplication and renamed to indicate this is an
