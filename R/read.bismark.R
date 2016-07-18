@@ -90,8 +90,9 @@ read.bismarkCovRaw <- function(thisfile,
     }
 
     ## Read in the file
-    if (ncol(fread(thisfile, header = FALSE, nrows = 0, verbose = FALSE,
-                   showProgress = FALSE)) != 6L) {
+    ## NOTE: Surprisingly, faster to use read.table() than data.table::fread()
+    ##       to check number of columns
+    if (ncol(read.table(thisfile, header = FALSE, nrows = 1)) != 6L) {
         stop("File does not appear to be in 'cov' format (ncol != 6)")
     }
     out <- fread(thisfile, header = FALSE, select = c(1, 2, 5, 6))
@@ -130,8 +131,9 @@ read.bismarkCytosineReportRaw <- function(thisfile,
     }
 
     ## Read in the file
-    if (ncol(fread(thisfile, header = FALSE, nrows = 0, verbose = FALSE,
-                   showProgress = FALSE)) != 7L) {
+    ## NOTE: Surprisingly, faster to use read.table() than data.table::fread()
+    ##       to check number of columns
+    if (ncol(read.table(thisfile, header = FALSE, nrows = 1)) != 7L) {
         stop("File does not appear to be in 'cytosineReport' format (ncol != 7)")
     }
     out <- fread(thisfile, header = FALSE, select = c(1, 2, 3, 4, 5))
