@@ -62,7 +62,11 @@ read.bismark <- function(files,
         cat(sprintf("[read.bismark] Joining samples ... "))
     }
     ptime1 <- proc.time()
-    allOut <- combineList(allOut, hdf5 = hdf5)
+    if (length(allOut) > 1L) {
+        allOut <- combineList(allOut, hdf5 = hdf5)
+    } else {
+        allOut <- allOut[[1L]]
+    }
     ptime2 <- proc.time()
     stime <- (ptime2 - ptime1)[3L]
     if (verbose) {
@@ -71,7 +75,6 @@ read.bismark <- function(files,
     allOut
 }
 
-# TODO: Should hdf5 be the default?
 read.bismarkCovRaw <- function(thisfile,
                                thisSampleName,
                                rmZeroCov,
@@ -87,10 +90,11 @@ read.bismarkCovRaw <- function(thisfile,
     }
 
     ## Read in the file
-    out <- fread(thisfile)
-    if (ncol(out) != 6L) {
-        stop("unknown file format")
+    if (ncol(fread(thisfile, header = FALSE, nrows = 0, verbose = FALSE,
+                   showProgress = FALSE)) != 6L) {
+        stop("File does not appear to be in 'cov' format (ncol != 6)")
     }
+    out <- fread(thisfile, header = FALSE, select = c(1, 2, 5, 6))
 
     ## Create GRanges instance from 'out'
     gr <- GRanges(seqnames = out[[1L]],
@@ -105,7 +109,6 @@ read.bismarkCovRaw <- function(thisfile,
           hdf5 = hdf5)
 }
 
-# TODO: Should hdf5 be the default?
 read.bismarkCytosineReportRaw <- function(thisfile,
                                           thisSampleName,
                                           rmZeroCov,
@@ -127,15 +130,16 @@ read.bismarkCytosineReportRaw <- function(thisfile,
     }
 
     ## Read in the file
-    out <- fread(thisfile)
-    if (ncol(out) != 7L) {
-        stop("unknown file format")
+    if (ncol(fread(thisfile, header = FALSE, nrows = 0, verbose = FALSE,
+                   showProgress = FALSE)) != 7L) {
+        stop("File does not appear to be in 'cytosineReport' format (ncol != 7)")
     }
+    out <- fread(thisfile, header = FALSE, select = c(1, 2, 3, 4, 5))
 
     ## Create GRanges instance from 'out'
-    gr <- GRanges(seqnames = out[[1]],
-                  ranges = IRanges(start = out[[2]], width = 1),
-                  strand = out[[3]])
+    gr <- GRanges(seqnames = out[[1L]],
+                  ranges = IRanges(start = out[[2L]], width = 1),
+                  strand = out[[3L]])
 
     ## Create BSseq instance from 'out'
     BSseq(gr = gr,

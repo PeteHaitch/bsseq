@@ -184,6 +184,13 @@ arguments break dispatch ...
 So I need to remove `NULL` elements before binding, e.g., 
 `do.call(rbind, (lst[sapply(lst, function(x) !is.null(x))]))`
 
+### TODO: Ask Hervé
+
+- [ ] `X1 <- HDF5Array(x)` ensures `dimnames(X1)` are identical to `dimnames(x)`, 
+      however, `X2 <- HDF5Array(writeHDF5Dataset(x))` does not (`dimnames(X2)` 
+      are `NULL`). Can this be fixed?
+    
+
 ## Wishlist
 
 ### Asked Hervé 2016-04-24
@@ -317,3 +324,31 @@ to add more unit tests to BSseq.
     - [ ] Relatedly, `library(HDF5Array)` or `require(HDF5Array)` or something 
           else when using HDF5Array in examples.
 - [ ] FWER of DMRs sounds like it could be candidate for optimisation
+- [ ] Parallel writes to a `.h5` file are not possible
+
+```r
+# This errors on a disk with slow access and seems to create a dodgy .h5 file 
+# on a fast disk
+mclapply(1:4, function(x) writeHDF5Dataset(DelayedArray(matrix(1:1000000)), file = getHDF5DumpFile(), name = paste0("kraken_", x)), mc.cores = 4)
+```
+    - [ ] Instead, can write each array to its own h5 file. Perhaps even 
+          better, write each samples `M`, `Cov`, `coef`, and `se.coef` - will 
+          need to be careful with writing `coef` and `se.coef`
+            
+```
+# What about if we write to a new .h5 file for each array
+mclapply(1:4, function(x) {
+    writeHDF5Dataset(DelayedArray(matrix(1:1000000)), 
+                     file = tempfile("matrix", tmpdir = ".", fileext = ".h5"),
+                     name = "M")
+}, mc.cores = 4)
+```
+- [ ] Use of `HDF5Array()` vs. `writeDataHDF5Dataset()`; `HDF5Array()` (via 
+      `HDF5Dataset`) errors if `file` is a DelayedArray unless `name = NA` and 
+      `type` is missing. I think this means I want to use 
+      `writeDataHDF5Dataset()` whenever it needs a `file` (other than 
+      `file = getHDF5DumpFile()` and/or when it needs a `name` (other than 
+      `name = getHDF5DumpName()`), e.g., whenever writes may be occuring in 
+      parallel.
+      - [ ] Will need to wrap the result in a call to `HDF5Array()` whenever 
+            it is to be used in downstream stuff.

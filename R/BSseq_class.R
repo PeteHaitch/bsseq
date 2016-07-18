@@ -106,83 +106,108 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
                   trans = NULL, parameters = NULL, pData = NULL,
                   gr = NULL, pos = NULL, chr = NULL, sampleNames = NULL,
                   rmZeroCov = FALSE, hdf5 = FALSE) {
-    if(is.null(gr)) {
-        if(is.null(pos) || is.null(chr))
+    if (is.null(gr)) {
+        if (is.null(pos) || is.null(chr)) {
             stop("Need pos and chr")
+        }
         gr <- GRanges(seqnames = chr, ranges = IRanges(start = pos, width = 1))
     }
-    if(!is(gr, "GRanges"))
+    if (!is(gr, "GRanges")) {
         stop("'gr' needs to be a GRanges")
-    if(any(width(gr)) != 1)
+    }
+    if (any(width(gr)) != 1) {
         stop("'gr' needs to have widths of 1")
-    if(is.null(M) || is.null(Cov))
+    }
+    if (is.null(M) || is.null(Cov)) {
         stop("Need M and Cov")
-    if(!is.matrix(M) && !is(M, "DelayedMatrix"))
+    }
+    if (!is.matrix(M) && !is(M, "DelayedMatrix")) {
         stop("'M' needs to be a matrix or DelayedMatrix")
-    if(!is.matrix(Cov) && !is(Cov, "DelayedMatrix"))
+    }
+    if (!is.matrix(Cov) && !is(Cov, "DelayedMatrix")) {
         stop("'Cov' needs to be a matrix or DelayedMatrix")
+    }
     if (!hdf5 &&
-        any(is(M, "HDF5Matrix"), is(Cov, "HDF5Matrix"),
-            is(coef, "HDF5Matrix"), is(se.coef, "HDF5Matrix"))) {
-        stop("'hdf5 = FALSE' but [M|Cov|coef|se.coef] is a HDF5Matrix.\n",
+        any(is(M, "DelayedMatrix"), is(Cov, "DelayedMatrix"),
+            is(coef, "DelayedMatrix"), is(se.coef, "DelayedMatrix"))) {
+        stop("'hdf5 = FALSE' but [M|Cov|coef|se.coef] is a DelayedMatrix.\n",
              "Are you sure you want to realise [M|Cov|coef|se.coef] in memory? ",
              "If so, first call 'as.array()' on the relevant object(s).")
     }
-    if(length(gr) != nrow(M) ||
-       length(gr) != nrow(Cov) ||
-       ncol(Cov) != ncol(M))
+    if (length(gr) != nrow(M) || length(gr) != nrow(Cov) ||
+       ncol(Cov) != ncol(M)) {
         stop("'gr', 'M' and 'Cov' need to have similar dimensions")
-    if(!is.null(rownames(M)))
+    }
+    if (!is.null(rownames(M))) {
         rownames(M) <- NULL
-    if(!is.null(rownames(Cov)))
+    }
+    if (!is.null(rownames(Cov))) {
         rownames(Cov) <- NULL
-    if(!is.null(names(gr)))
+    }
+    if (!is.null(names(gr))) {
         names(gr) <- NULL
+    }
     ## deal with sampleNames
-    if(!is(pData, "DataFrame"))
+    if (!is(pData, "DataFrame")) {
         pData <- as(pData, "DataFrame")
-    if(is.null(sampleNames) && !is.null(pData) && !is.null(rownames(pData)))
+    }
+    if (is.null(sampleNames) && !is.null(pData) && !is.null(rownames(pData))) {
         sampleNames <- rownames(pData)
-    if(is.null(sampleNames) && !is.null(colnames(M)))
+    }
+    if (is.null(sampleNames) && !is.null(colnames(M))) {
         sampleNames <- colnames(M)
-    if(is.null(sampleNames) && !is.null(colnames(Cov)))
+    }
+    if (is.null(sampleNames) && !is.null(colnames(Cov))) {
         sampleNames <- colnames(Cov)
-    if(is.null(sampleNames))
+    }
+    if (is.null(sampleNames)) {
         sampleNames <- paste("V", 1:ncol(M), sep = "")
-    if(length(unique(sampleNames)) != ncol(M))
+    }
+    if (length(unique(sampleNames)) != ncol(M)) {
         stop("sampleNames need to be unique and of the right length.")
+    }
     ## check that 0 <= M <= Cov and remove positions with Cov = 0
-    if(any(M < 0) || any(M > Cov) || any(is.na(M)) || any(is.na(Cov)) ||
-       any(is.infinite(Cov)))
+    if (any(M < 0) || any(M > Cov) || any(is.na(M)) || any(is.na(Cov)) ||
+       any(is.infinite(Cov))) {
         stop("'M' and 'Cov' may not contain NA or infinite values and 0 <= M <= Cov")
-    if(rmZeroCov) {
+    }
+    if (rmZeroCov) {
         wh <- which(rowSums(Cov) == 0)
-        if(length(wh) > 0) {
+        if (length(wh) > 0) {
             gr <- gr[-wh]
             M <- M[-wh, ,drop = FALSE]
             Cov <- Cov[-wh, ,drop = FALSE]
         }
     }
+    # TODO: This step is quite slow when gr is long (it creates another GRanges
+    #       of similar length). Is there an identical but faster/cheaper
+    #       method to test the same logic? What even is the question this is
+    #       designed to test?
     grR <- reduce(gr, min.gapwidth = 0L)
-    if(!identical(grR, gr)) {
+    if (!identical(grR, gr)) {
         ## Now we either need to re-order or collapse or both
-        mm <- as.matrix(findOverlaps(grR, gr))
-        mm <- mm[order(mm[, 1]), ]
-        if(length(grR) == length(gr)) {
+        ov <- findOverlaps(grR, gr)
+        if (length(grR) == length(gr)) {
             ## only re-ordering is necessary
             gr <- grR
-            M <- M[mm[, 2], , drop = FALSE]
-            Cov <- Cov[mm[, 2], , drop = FALSE]
-            if(!is.null(coef))
-                coef <- coef[mm[, 2], ,drop = FALSE]
-            if(!is.null(se.coef))
-                se.coef <- se.coef[mm[, 2], , drop = FALSE]
+            M <- M[subjectHits(ov), , drop = FALSE]
+            Cov <- Cov[subjectHits(ov), , drop = FALSE]
+            if (!is.null(coef)) {
+                coef <- coef[subjectHits(ov), , drop = FALSE]
+            }
+            if (!is.null(se.coef)) {
+                se.coef <- se.coef[subjectHits(ov), , drop = FALSE]
+            }
         } else {
+            # TODO: Need to check this branch. E.g., think it will more
+            #       efficient to split the matrix-like objects rather than the
+            #       overlaps (see getMeth()).
             warning("multiple positions, collapsing BSseq object\n")
-            if(!is.null(coef) || !is.null(se.coef))
+            if (!is.null(coef) || !is.null(se.coef)) {
                 stop("Cannot collapse when 'coef' or 'se.coef' are present")
+            }
             gr <- grR
-            sp <- split(mm[, 2], mm[, 1])[as.character(1:length(grR))]
+            sp <- split(subjetHits(ol), queryHits(ol))[as.character(1:length(grR))]
             names(sp) <- NULL
             # NOTE: Special case for DelayedMatrix (really targetting
             #       HDF5Matrix but generally applicable) since we don't want to
@@ -214,51 +239,68 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
             }
         }
     }
-    if(is.null(colnames(M)) || any(sampleNames != colnames(M)))
-        colnames(M) <- sampleNames
-    if(is.null(colnames(Cov)) || any(sampleNames != colnames(Cov)))
-        colnames(Cov) <- sampleNames
-    if(!is.null(coef)) {
-        if((!is.matrix(coef) && !is(coef, "DelayedArray")) ||
-           nrow(coef) != nrow(M) ||
-           ncol(coef) != ncol(M))
-            stop("'coef' does not have the right dimensions")
-        if(is.null(colnames(coef)) || any(sampleNames != colnames(coef)))
-            colnames(coef) <- sampleNames
-        if(!is.null(rownames(coef)))
-            rownames(coef) <- NULL
-    }
-    if(!is.null(se.coef)) {
-        if(!is.matrix(se.coef) ||
-           nrow(se.coef) != nrow(M) ||
-           ncol(se.coef) != ncol(M))
-            stop("'se.coef' does not have the right dimensions")
-        if(is.null(colnames(se.coef)) || any(sampleNames != colnames(se.coef)))
-            colnames(se.coef) <- sampleNames
-        if(!is.null(rownames(se.coef)))
-            rownames(se.coef) <- NULL
-    }
     if (hdf5) {
-        M <- HDF5Array(M)
-        Cov <- HDF5Array(Cov)
+        hdf5_file <- .newBSseqHDF5Filename()
+        M <- HDF5Array(writeHDF5Dataset(M, file = hdf5_file, name = "M"))
+        Cov <- HDF5Array(writeHDF5Dataset(Cov, file = hdf5_file, name = "Cov"))
         if (!is.null(coef)) {
-            coef <- HDF5Array(coef)
+            coef <- HDF5Array(writeHDF5Dataset(coef, file = hdf5_file,
+                                                name = "coef"))
         }
         if (!is.null(se.coef)) {
-            se.coef <- HDF5Array(coef)
+            se.coef <- HDF5Array(writeHDF5Dataset(se.coef, file = hdf5_file,
+                                                  name = "se.coef"))
         }
     }
+    # Set dimnames of M, Cov, coef, and se.coef. Also check dimensionaity of
+    # coef and se.coef
+    if (is.null(colnames(M)) || any(sampleNames != colnames(M))) {
+        colnames(M) <- sampleNames
+    }
+    if (is.null(colnames(Cov)) || any(sampleNames != colnames(Cov))) {
+        colnames(Cov) <- sampleNames
+    }
+    if (!is.null(coef)) {
+        if ((!is.matrix(coef) && !is(coef, "DelayedArray")) ||
+            nrow(coef) != nrow(M) || ncol(coef) != ncol(M)) {
+            stop("'coef' does not have the right dimensions")
+        }
+        if (is.null(colnames(coef)) || any(sampleNames != colnames(coef))) {
+            colnames(coef) <- sampleNames
+        }
+        if (!is.null(rownames(coef))) {
+            rownames(coef) <- NULL
+        }
+    }
+    if (!is.null(se.coef)) {
+        if (!is.matrix(se.coef) || nrow(se.coef) != nrow(M) ||
+            ncol(se.coef) != ncol(M)) {
+            stop("'se.coef' does not have the right dimensions")
+        }
+        if (is.null(colnames(se.coef)) ||
+            any(sampleNames != colnames(se.coef))) {
+            colnames(se.coef) <- sampleNames
+        }
+        if (!is.null(rownames(se.coef))) {
+            rownames(se.coef) <- NULL
+        }
+    }
+    # Make BSseq object
     assays <- SimpleList(M = M, Cov = Cov, coef = coef, se.coef = se.coef)
     assays <- assays[!sapply(assays, is.null)]
-    if(is.null(pData) || all(dim(pData) == c(0,0)))
+    if (is.null(pData) || all(dim(pData) == c(0, 0))) {
         BSseq <- SummarizedExperiment(assays = assays, rowRanges = gr)
-    else
-        BSseq <- SummarizedExperiment(assays = assays, rowRanges = gr, colData = pData)
+    } else {
+        BSseq <- SummarizedExperiment(assays = assays, rowRanges = gr,
+                                      colData = pData)
+    }
     BSseq <- as(BSseq, "BSseq")
-    if(is.function(trans))
+    if (is.function(trans)) {
         BSseq@trans <- trans
-    if(is.list(parameters))
+    }
+    if (is.list(parameters)) {
         BSseq@parameters <- parameters
+    }
     BSseq
 }
 
