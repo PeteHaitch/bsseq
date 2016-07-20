@@ -75,6 +75,7 @@ read.bismark <- function(files,
     allOut
 }
 
+# TODO: Add same data.table wizardy as is used in read.bismarkCytosineRaw()
 read.bismarkCovRaw <- function(thisfile,
                                thisSampleName,
                                rmZeroCov,
@@ -137,18 +138,41 @@ read.bismarkCytosineReportRaw <- function(thisfile,
         stop("File does not appear to be in 'cytosineReport' format (ncol != 7)")
     }
     out <- fread(thisfile, header = FALSE, select = c(1, 2, 3, 4, 5))
-
+    setnames(out, paste0("V", 1:5), c("seqnames", "pos", "strand", "M", "U"))
+    # TODO: Sort out in place using data.table wizardy. This is technically a
+    #       breaking change (and should be documented) but one that I think is
+    #       worth introducing. Sort order is based on sortSeqlevels() and is
+    #       limited to individual files, i.e. there is no guarantee that the
+    #       object returned by read.bismark() is sorted.
+    # TODO: Could add a seqinfo argument to read.bismark() that could be used
+    #       to ensure the output of read.bismark() was sorted. The default
+    #       value would infer the seqinfo from the bismark input files,
+    #       although this could not guarantee the final object returned by
+    #       read.bismark() was sorted
+    # NOTE: Drop columns of 'out' once they are no longer required
+    seqlevels <- out[, sortSeqlevels(unique(seqnames))]
+    out[, c("seqnames", "strand") :=
+            list(factor(seqnames, seqlevels), factor(strand, levels(strand())))]
+    setkey(out, seqnames, strand, pos)
+    seqnames_strand <- out[, .N, by = list(seqnames, strand)]
+    out[, c("seqnames", "strand") := NULL]
+    seqnames <- Rle(seqnames_strand[, seqnames], seqnames_strand[, N])
+    strand <- Rle(seqnames_strand[, strand], seqnames_strand[, N])
+    M <- as.matrix(out[, M])
+    out[, M := NULL]
+    Cov <- M + out[, U]
+    out[, U := NULL]
     ## Create GRanges instance from 'out'
-    gr <- GRanges(seqnames = out[[1L]],
-                  ranges = IRanges(start = out[[2L]], width = 1),
-                  strand = out[[3L]])
+    gr <- GRanges(seqnames = seqnames,
+                  ranges = IRanges(out[, pos], width = 1L),
+                  strand = strand)
+    out[, pos := NULL]
 
     ## Create BSseq instance from 'out'
     BSseq(gr = gr,
           sampleNames = thisSampleName,
-          M = as.matrix(out[[4L]]),
-          Cov = as.matrix(out[[4L]] + out[[5L]]),
+          M = M,
+          Cov = Cov,
           rmZeroCov = rmZeroCov,
           hdf5 = hdf5)
-
 }
