@@ -20,8 +20,8 @@ plotAnnoTrack <- function(gr, annoTrack, cex) {
 #       than this ad hoc data.frame (e.g., based on TxDb.* packages)
 plotGeneTrack <- function(gr, geneTrack, cex) {
     geneTrack_gr <- makeGRangesFromDataFrame(geneTrack)
-    ol <- findOverlaps(geneTrack_gr, gr)
-    genes <- geneTrack[queryHits(ol), ]
+    ov <- findOverlaps(geneTrack_gr, gr)
+    genes <- geneTrack[queryHits(ov), ]
     plot(start(gr), 1, type = "n", xaxt = "n", yaxt = "n", bty = "n",
          ylim = c(-1.5, 1.5), xlim = c(start(gr), end(gr)),
          xlab = "", ylab = "", cex.lab = 4, lheight = 2, cex.axis = 1)
