@@ -267,7 +267,8 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
         }))
     } else {
         stop("Cannot combine list of objects with classes: ",
-             paste0(cl, collapse = ", "))
+             paste0(vapply(matrix_list, class, character(length(matrix_list))),
+                    collapse = ", "))
     }
     z
 }
@@ -301,12 +302,20 @@ combineList <- function(x, ..., hdf5 = FALSE) {
         stop("sampleNames of inputs must not overlap")
     }
     if (all(sameGr)) {
-        # NOTE: Can shortcut and cbind the BSseq objects since they all have
+        # NOTE: Can shortcut and cbind() the BSseq objects since they all have
         #       the same GRanges. But first need to:
         #       1. Remove smoothing information (coef, se.coef, trans,
         #          parameters) unless all objects have been smoothed
         #       2. Ensure the assays have compatible classes
         #       3. Act on the hdf5 argument
+        #
+        #       However, calling do.call(cbind, x) defers to
+        #       cbind,SummarizedExperiment-method which checks that the
+        #       @rowRanges slot in each object is identical **but we've already
+        #       done that**. So, to avoid duplicated effort, we simply combine
+        #       the remaining slots in the appropriate fashion and construct a
+        #       new BSseq object (whilst also avoiding the overhead of the
+        #       BSseq() constructor)
         # (1)
         has_been_smoothed <- vapply(x, hasBeenSmoothed, logical(1L))
         if (any(!has_been_smoothed)) {
@@ -340,7 +349,15 @@ combineList <- function(x, ..., hdf5 = FALSE) {
                 xx
             })
         }
-        return(do.call(cbind, x))
+        # Adapted from SummarizedExperiment:::.cbind.SummarizedExperiment
+        assays <- do.call(cbind, lapply(x, slot, "assays"))
+        metadata <- do.call(c, lapply(x, metadata))
+        pData <- as(Reduce(combine, lapply(x, function(xx) {
+            as.data.frame(pData(xx))
+        })), "DataFrame")
+        BSseq <- SummarizedExperiment(assays = assays, rowRanges = gr,
+                                      colData = pData, metadata = metadata)
+        BSseq <- as(BSseq, "BSseq")
     } else {
         # TODO: This will create a very long intermediate GRanges object
         #       and takes a while to run when the objects are long and/or there
@@ -384,9 +401,10 @@ combineList <- function(x, ..., hdf5 = FALSE) {
         pData <- as(Reduce(combine, lapply(x, function(xx) {
             as.data.frame(pData(xx))
         })), "DataFrame")
+        metadata <- do.call(c, lapply(x, metadata))
         BSseq <- SummarizedExperiment(assays = assays, rowRanges = gr,
-                                      colData = pData)
+                                      colData = pData, metadata = metadata)
         BSseq <- as(BSseq, "BSseq")
-        BSseq
     }
+    BSseq
 }
