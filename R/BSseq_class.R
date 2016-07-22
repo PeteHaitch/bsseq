@@ -167,12 +167,7 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         stop("sampleNames need to be unique and of the right length.")
     }
     ## check that 0 <= M <= Cov and remove positions with Cov = 0
-    # TODO: This loop requires multiple passes over M and Cov and makes
-    #       multiple large intermediate vectors; re-write in C
-    #       using a single pass and breaking out of the loop as early as
-    #       possible
-    if (any(M < 0) || any(M > Cov) || any(is.na(M)) || any(is.na(Cov)) ||
-       any(is.infinite(Cov))) {
+    if (!.validCovAndM(Cov, M)) {
         stop("'M' and 'Cov' may not contain NA or infinite values and 0 <= M <= Cov")
     }
     if (rmZeroCov) {
@@ -188,7 +183,6 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
     #       method to test the same logic? What even is the question this is
     #       designed to test?
     grR <- reduce(gr, min.gapwidth = 0L)
-    # TODO: Is it worth rm(grR) after running identical(grR, gr)?
     if (!identical(grR, gr)) {
         ## Now we either need to re-order or collapse or both
         ov <- findOverlaps(grR, gr)
@@ -212,7 +206,7 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
                 stop("Cannot collapse when 'coef' or 'se.coef' are present")
             }
             gr <- grR
-            sp <- split(subjetHits(ol), queryHits(ol))[as.character(1:length(grR))]
+            sp <- split(subjectHits(ov), queryHits(ov))[as.character(1:length(grR))]
             names(sp) <- NULL
             # NOTE: Special case for DelayedMatrix (really targetting
             #       HDF5Matrix but generally applicable) since we don't want to

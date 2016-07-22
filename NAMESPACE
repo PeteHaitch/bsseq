@@ -34,6 +34,7 @@ importFrom(R.utils, "isGzipped", "gunzip")
 import(limma)
 importFrom(permute, "shuffleSet", "how")
 import(HDF5Array)
+importFrom(Rcpp, "sourceCpp")
 
 ##
 ## Exporting
@@ -77,6 +78,8 @@ S3method("print", "summary.BSseqTstat")
 S3method("summary", "BSseqTstat")
 S3method("plot", "BSseqTstat")
 
-## Fixes, to be removed
+useDynLib(bsseq, .registration = TRUE)
+
+## TODO: Fixes, to be removed
 
 exportMethods("assays", "assayNames")

@@ -83,3 +83,28 @@ getHDF5DumpDir <- function() {
 .newBSseqHDF5Filename <- function() {
     tempfile(pattern = "BSseq.", tmpdir = getHDF5DumpDir(), ".h5")
 }
+
+# Helper function used by BSseq()
+# TODO: Unit tests demonstrating equivalence of this to
+#       `any(M < 0) || any(M > Cov) || any(is.na(M)) ||
+#       any(is.na(Cov)) || any(is.infinite(Cov))`
+.validCovAndM <- function(Cov, M) {
+    if (is(Cov, "DelayedMatrix") || is(M, "DelayedMatrix")) {
+        # TODO: A custom method for DelayedMatrix objects
+    is_valid <- any(M < 0) || any(M > Cov) || any(is.na(M)) ||
+        any(is.na(Cov)) || any(is.infinite(Cov))
+        return(!is_valid)
+    } else {
+        if (is.integer(Cov) && is.integer(M)) {
+            return(.validIntegerCovAndIntegerM(Cov, M))
+        } else if (is.integer(Cov) && is.numeric(M)) {
+            return(.validIntegerCovAndNumericM(Cov, M))
+        } else if (is.numeric(Cov) && is.integer(M)) {
+            return(.validNumericCovAndIntegerM(Cov, M))
+        } else if (is.numeric(Cov) && is.numeric(M)) {
+            return(.validNumericCovAndNumericM(Cov, M))
+        } else {
+            stop("M and/or Cov are neither integer nor numeric matrices")
+        }
+    }
+}

@@ -1,5 +1,5 @@
 Package: bsseq
-Version: 1.9.1.9000
+Version: 1.9.1.9001
 Encoding: UTF-8
 Title: Analyze, manage and store bisulfite sequencing data
 Description: A collection of tools for analyzing and visualizing bisulfite
@@ -30,6 +30,7 @@ Imports:
     R.utils (>= 2.0.0),
     matrixStats (>= 0.50.0),
     permute,
+    Rcpp
 Suggests:
     RUnit,
     bsseqData,
@@ -54,6 +55,7 @@ Collate:
     BSmooth.fstat.R
     BSseqStat_class.R
     getStats.R
+    RcppExports.R
 License: Artistic-2.0
 VignetteBuilder: knitr
 URL: https://github.com/kasperdanielhansen/bsseq
@@ -61,3 +63,4 @@ LazyData: yes
 LazyDataCompression: xz
 BugReports: https://github.com/kasperdanielhansen/bsseq/issues
 biocViews: DNAMethylation
+LinkingTo: Rcpp
