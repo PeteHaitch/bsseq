@@ -352,3 +352,14 @@ mclapply(1:4, function(x) {
       parallel.
       - [ ] Will need to wrap the result in a call to `HDF5Array()` whenever 
             it is to be used in downstream stuff.
+- [ ] When ready for merge, document all changes by diffing against master
+- [ ] Package up this logic into a function
+
+```r
+f <- function(a, an) {
+    hdf5_file <- .newBSseqHDF5Filename()
+    a <- HDF5Array(writeHDF5Dataset(a, file = hdf5_file, name = an))
+    HDF5Array(a)
+}
+    
+```

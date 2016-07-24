@@ -71,11 +71,6 @@ setReplaceMethod("sampleNames",
                      object
                  })
 
-# TODO: Redundant, length,SummarizedExperiment-method
-setMethod("length", "BSseq", function(x) {
-    length(granges(x))
-})
-
 hasBeenSmoothed <- function(BSseq) {
     "coef" %in% assayNames(BSseq)
 }
@@ -100,8 +95,6 @@ getBSseq <- function(BSseq, type = c("Cov", "M", "gr", "coef", "se.coef", "trans
 # NOTE: hdf5 = FALSE only has effect if [M|Cov|coef|se.coef] is not already a
 #       HDF5Matrix object, i.e. it will never realise a HDF5Matrix as an
 #       array/matrix
-# TODO: If the user forgets to set hdf5 = TRUE then BSseq() errors when any of
-#       the matrix-like objects are HDF5Matrix
 BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
                   trans = NULL, parameters = NULL, pData = NULL,
                   gr = NULL, pos = NULL, chr = NULL, sampleNames = NULL,
@@ -239,6 +232,9 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         }
     }
     if (hdf5) {
+        # TODO: If M (Cov, coef, se.coef) is already a HDF5-backed
+        #       DelayedMatrix then probably want to avoid making a copy of it
+        #       **provided that identical(grR, gr) is TRUE**
         hdf5_file <- .newBSseqHDF5Filename()
         M <- HDF5Array(writeHDF5Dataset(M, file = hdf5_file, name = "M"))
         Cov <- HDF5Array(writeHDF5Dataset(Cov, file = hdf5_file, name = "Cov"))
