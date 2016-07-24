@@ -339,13 +339,16 @@ combineList <- function(x, ..., hdf5 = FALSE) {
         if ((all(is_matrix) && hdf5) ||
             (!all(is_matrix) && !all(is_DelayedMatrix))) {
             x <- lapply(x, function(xx) {
-                assays(xx) <- endoapply(assays(xx), function(a) {
+                assays(xx) <- mendoapply(function(a, an) {
                     # NOTE: Only convert those assays that need converting
                     if (is.matrix(a) && !is(a, "DelayedMatrix")) {
+                        hdf5_file <- .newBSseqHDF5Filename()
+                        a <- HDF5Array(writeHDF5Dataset(a, file = hdf5_file,
+                                                        name = an))
                         a <- HDF5Array(a)
                     }
                     a
-                })
+                }, a = assays(xx), an = assayNames(xx))
                 xx
             })
         }
@@ -355,8 +358,10 @@ combineList <- function(x, ..., hdf5 = FALSE) {
         pData <- as(Reduce(combine, lapply(x, function(xx) {
             as.data.frame(pData(xx))
         })), "DataFrame")
-        BSseq <- SummarizedExperiment(assays = assays, rowRanges = gr,
-                                      colData = pData, metadata = metadata)
+        BSseq <- SummarizedExperiment(assays = as(assays, "SimpleList"),
+                                      rowRanges = gr,
+                                      colData = pData,
+                                      metadata = metadata)
         BSseq <- as(BSseq, "BSseq")
     } else {
         # TODO: This will create a very long intermediate GRanges object
