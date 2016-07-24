@@ -353,13 +353,5 @@ mclapply(1:4, function(x) {
       - [ ] Will need to wrap the result in a call to `HDF5Array()` whenever 
             it is to be used in downstream stuff.
 - [ ] When ready for merge, document all changes by diffing against master
-- [ ] Package up this logic into a function
-
-```r
-f <- function(a, an) {
-    hdf5_file <- .newBSseqHDF5Filename()
-    a <- HDF5Array(writeHDF5Dataset(a, file = hdf5_file, name = an))
-    HDF5Array(a)
-}
-    
-```
+- [ ] Remove HDF5 support for `read.umtab()` and other legacy formats (keeping them will only add to maintainence burden)
+- [ ] Minimise creations of `.h5` files by re-using a file iff its guaranteed to be safe

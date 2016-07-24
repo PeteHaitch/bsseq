@@ -111,6 +111,7 @@
 
   # Using HDF5Array
   library(HDF5Array)
+  setHDF5DumpDir()
   bismarkBSseq.hdf5 <- read.bismark(files = infile,
                                     sampleNames = "test_data",
                                     rmZeroCov = FALSE,

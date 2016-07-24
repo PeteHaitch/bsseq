@@ -76,6 +76,7 @@ if(require(bsseqData)) {
 
   # Using HDF5Array-backed BSseqTstat object
   library(HDF5Array)
+  setHDF5DumpDir()
   BS.cancer.ex.tstat.hdf5 <- BS.cancer.ex.tstat
   BS.cancer.ex.tstat.hdf5@stats <- HDF5Array(BS.cancer.ex.tstat.hdf5@stats)
   dmrs0.hdf5 <- dmrFinder(BS.cancer.ex.tstat.hdf5, cutoff = c(-4.6, 4.6),

@@ -59,6 +59,7 @@ BSmooth.fstat(BSseq, design, contrasts, verbose = TRUE)
 
         # Using HDF5Array
         library(HDF5Array)
+        setHDF5DumpDir()
         # TODO: Subset before calling HDF5Array() otherwise the resulting
         #       DelayedMatrix carries around the i-subsetting in the `@index`
         #       slot, which must be realised when any delayed ops are

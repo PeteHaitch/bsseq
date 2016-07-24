@@ -64,6 +64,8 @@ results <- fisherTests(BStest, group1 = "A1", group2 = "A2",
 results
 
 # Using HDF5Array
+library(HDF5Array)
+setHDF5DumpDir()
 M.hdf5 <- HDF5Array(M)
 BStest.hdf5 <- BSseq(pos = 1:3, chr = c("chr1", "chr2", "chr1"),
                      M = M.hdf5, Cov = M.hdf5 + 2, hdf5 = TRUE)

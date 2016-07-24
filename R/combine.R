@@ -1,6 +1,3 @@
-# TODO: Update all files that create .h5 files to use
-#       HDF5Array(writeHDF5Dataset(x, file = .newBSseqHDF5Filename(), name =
-#                 "callingFunction") syntax
 # TODO: Do really need both combine() and combineList(); combineList() is
 #       demonstrably faster when > 2 BSseq objects and same speed when
 #       2 BSseq objects. Maintaining both introduces redundancy and overhead.
@@ -15,7 +12,7 @@
 # NOTE: i is used to ensure names are unique when lapply()-ing this function
 #       on a list of DelayedMatrix objects (see .combineListMatrixLike for an
 #       example)
-.combineDelayedMatrix <- function(m, idx, nrow, fill, file, i = 1) {
+.combineDelayedMatrix <- function(m, idx, nrow, fill, i = 1) {
     # TODO: Could consider using mclapply(), but (A) is it worth it? and
     #       (B) would need to be careful in case .combineMatrixList() is
     #       itsself called from a function using mclapply(). Would also need
@@ -23,9 +20,7 @@
     M <- lapply(seq_len(ncol(m)), function(j) {
         mm <- matrix(fill, nrow = nrow, ncol = 1L)
         mm[idx, 1L] <- as.array(m[, j, drop = FALSE])
-        HDF5Array(writeHDF5Dataset(mm, file = file,
-                                   name = paste0("combineDelayedMatrix.", i,
-                                                 ".", j)))
+        .safeHDF5Array(mm, "BSseq", paste0("combineDelayedMatrix.", i, ".", j))
     })
     if (length(M) > 1) {
         M <- do.call(cbind, M)
@@ -163,9 +158,9 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
         #                           idx_y = queryHits(ov_y), nrow = nrow,
         #                           ncol = ncol, fill = 0L)
         Cov  <- .combineListMatrixLike(matrix_list = list(Cov_x, Cov_y),
-                                     idx_list = list(queryHits(ov_x),
-                                                     queryHits(ov_y)),
-                                     nrow = nrow, ncol = ncol, fill = 0L)
+                                       idx_list = list(queryHits(ov_x),
+                                                       queryHits(ov_y)),
+                                       nrow = nrow, ncol = ncol, fill = 0L)
         colnames(M) <- sampleNames
         colnames(Cov) <- sampleNames
         if (!hasBeenSmoothed(x) || !hasBeenSmoothed(y)) {
@@ -190,10 +185,10 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
             #                            nrow = nrow, ncol = ncol,
             #                            fill = NA_real_)
             coef  <- .combineListMatrixLike(matrix_list = list(coef_x, coef_y),
-                                         idx_list = list(queryHits(ov_x),
-                                                         queryHits(ov_y)),
-                                         nrow = nrow, ncol = ncol,
-                                         fill = NA_real_)
+                                            idx_list = list(queryHits(ov_x),
+                                                            queryHits(ov_y)),
+                                            nrow = nrow, ncol = ncol,
+                                            fill = NA_real_)
             colnames(coef) <- sampleNames
             if (is.null(getBSseq(x, "se.coef")) &&
                 is.null(getBSseq(x, "se.coef"))) {
@@ -221,10 +216,10 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
                 #                               fill = NA_real_)
                 se.coef  <- .combineListMatrixLike(matrix_list = list(se.coef_x,
                                                                       se.coef_y),
-                                             idx_list = list(queryHits(ov_x),
-                                                             queryHits(ov_y)),
-                                             nrow = nrow, ncol = ncol,
-                                             fill = NA_real_)
+                                                   idx_list = list(queryHits(ov_x),
+                                                                   queryHits(ov_y)),
+                                                   nrow = nrow, ncol = ncol,
+                                                   fill = NA_real_)
                 colnames(se.coef) <- sampleNames
             }
             trans <- getBSseq(x, "trans")
@@ -250,9 +245,7 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
             j0 <- j0 + ncol(matrix_list[[j]])
         }
         if (hdf5) {
-            hdf5_file <- .newBSseqHDF5Filename()
-            z <- HDF5Array(writeHDF5Dataset(z, file = hdf5_file,
-                                            name = "combineListMatrixLike"))
+            z <- .safeHDF5Array(z, "BSseq", "z")
         }
     } else if (any(is_DelayedMatrix) || hdf5) {
         # TODO: Could consider using mcmapply(), but (A) is it worth it? and
@@ -260,10 +253,10 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
         #       itself called from a function using mclapply(). Would also
         #       need to ensure that each object was written to a new .h5
         #       (`file`)
-        hdf5_file <- .newBSseqHDF5Filename()
+        # TODO: Consolidate into a single .h5 file if running serially
         z <- do.call(cbind, lapply(seq_along(matrix_list), function(i) {
             .combineDelayedMatrix(matrix_list[[i]], idx_list[[i]], nrow,
-                                  fill, hdf5_file, i)
+                                  fill, i)
         }))
     } else {
         stop("Cannot combine list of objects with classes: ",
@@ -342,10 +335,7 @@ combineList <- function(x, ..., hdf5 = FALSE) {
                 assays(xx) <- mendoapply(function(a, an) {
                     # NOTE: Only convert those assays that need converting
                     if (is.matrix(a) && !is(a, "DelayedMatrix")) {
-                        hdf5_file <- .newBSseqHDF5Filename()
-                        a <- HDF5Array(writeHDF5Dataset(a, file = hdf5_file,
-                                                        name = an))
-                        a <- HDF5Array(a)
+                        a <- .safeHDF5Array(a, "BSseq", an)
                     }
                     a
                 }, a = assays(xx), an = assayNames(xx))

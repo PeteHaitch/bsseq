@@ -72,8 +72,5 @@ umDir <- system.file("umtab", package = "bsseqData")
 sampleNames <- list.files(umDir)
 dirs <- file.path(umDir, sampleNames, "umtab")
 umData <- read.umtab(dirs, sampleNames)
-
-# Using HDF5Array
-umData.hdf5 <- read.umtab(dirs, sampleNames, hdf5 = TRUE)
 }
 }

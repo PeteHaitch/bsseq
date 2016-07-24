@@ -23,9 +23,8 @@ collapseBSseq <- function(BSseq, columns, hdf5 = FALSE) {
         rowSums(getBSseq(BSseq, "Cov")[, ss, drop = FALSE])
     }))
     if (hdf5) {
-        hdf5_file <- .newBSseqHDF5Filename()
-        M <- HDF5Array(writeHDF5Dataset(M, file = hdf5_file, name = "M"))
-        Cov <- HDF5Array(writeHDF5Dataset(M, file = hdf5_file, name = "Cov"))
+        M <- .safeHDF5Array(M, "BSseq", "M")
+        Cov <- .safeHDF5Array(Cov, "BSseq", "Cov")
     }
     BSseq(gr = getBSseq(BSseq, "gr"), M = M, Cov = Cov,
           sampleNames = names(sp), hdf5 = hdf5)

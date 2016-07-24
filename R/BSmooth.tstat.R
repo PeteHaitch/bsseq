@@ -97,10 +97,12 @@ BSmooth.tstat <- function(BSseq, group1, group2,
         cn <- c(cn, "tstat.corrected")
     }
     if (hdf5) {
-        group1.means <- HDF5Array(
-            as.matrix(rowMeans(allPs[, group1, drop = FALSE], na.rm = TRUE)))
-        group2.means <- HDF5Array(
-            as.matrix(rowMeans(allPs[, group2, drop = FALSE], na.rm = TRUE)))
+        group1.means <- .safeHDF5Array(
+            as.matrix(rowMeans(allPs[, group1, drop = FALSE], na.rm = TRUE)),
+            "BSseq", "group1.means")
+        group2.means <- .safeHDF5Array(
+            as.matrix(rowMeans(allPs[, group2, drop = FALSE], na.rm = TRUE)),
+            "BSseq", "groups2.means")
     } else {
         # NOTE: Preallocate stats to avoid copies that would otherwise
         #       occur when cbind()-ing vectors to form stats
@@ -159,12 +161,14 @@ BSmooth.tstat <- function(BSseq, group1, group2,
                scale <- sqrt(1/length(group1))
            })
     if (hdf5) {
-        tstat.sd <- HDF5Array(
+        tstat.sd <- .safeHDF5Array(
             as.matrix(do.call(c, mclapply(clusterIdx, function(idx) {
             scale * .smoothSd(rawSds[idx], k = k, qSd = qSd)
-        }, mc.cores = mc.cores))))
-        rawSds <- HDF5Array(as.matrix(rawSds))
-        tstat <- HDF5Array((group1.means - group2.means) / tstat.sd)
+        }, mc.cores = mc.cores))),
+        "BSseq", "tstat.sd")
+        rawSds <- .safeHDF5Array(as.matrix(rawSds), "BSseq", "rawSds")
+        tstat <- .safeHDF5Array((group1.means - group2.means) / tstat.sd,
+                               "BSseq", "tstat")
     } else {
         stats[, "tstat.sd"] <- do.call(c, mclapply(clusterIdx, function(idx) {
             scale * .smoothSd(stats[idx, "rawSds"], k = k, qSd = qSd)
@@ -179,12 +183,13 @@ BSmooth.tstat <- function(BSseq, group1, group2,
     # is.na(tstat)[tstat.sd == 0] <- TRUE
     if (local.correct) {
         if (hdf5) {
-            tstat.corrected <-
-                HDF5Array(as.matrix(do.call(c, mclapply(clusterIdx,
-                                                        compute.correction,
-                                                        tstat = as.array(tstat),
-                                                        qSd = qSd,
-                                                        mc.cores = mc.cores))))
+            tstat.corrected <- .safeHDF5Array(
+                as.matrix(do.call(c, mclapply(clusterIdx,
+                                              compute.correction,
+                                              tstat = as.array(tstat),
+                                              qSd = qSd,
+                                              mc.cores = mc.cores))),
+                "BSseq", "tstat.corrected")
         } else {
             stats[, "tstat.corrected"] <-
                 do.call(c, mclapply(clusterIdx,

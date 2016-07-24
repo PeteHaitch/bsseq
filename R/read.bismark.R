@@ -102,7 +102,7 @@ read.bismarkCovRaw <- function(thisfile,
     }
     out <- fread(thisfile, header = FALSE, select = c(1, 2, 5, 6))
 
-    setnames(out, paste0("V", 1:4), c("seqnames", "pos", "M", "U"))
+    setnames(out, paste0("V", c(1, 2, 5, 6)), c("seqnames", "pos", "M", "U"))
     # NOTE: Sort out in place using data.table wizardy. This is technically a
     #       breaking change (and should be documented) but one that I think is
     #       worth introducing. Sort order is based on sortSeqlevels() and is
@@ -114,7 +114,7 @@ read.bismarkCovRaw <- function(thisfile,
     setkey(out, seqnames, pos)
     seqnames <- out[, .N, by = seqnames]
     out[, "seqnames" := NULL]
-    seqnames <- Rle(seqnames_strand[, seqnames], seqnames_strand[, N])
+    seqnames <- Rle(seqnames[, seqnames], seqnames[, N])
     strand <- strand(Rle("*", nrow(out)))
     M <- as.matrix(out[, M])
     out[, M := NULL]

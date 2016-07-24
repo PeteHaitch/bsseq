@@ -70,20 +70,6 @@ setMethod("assayNames", "BSseq",
     sSds
 }
 
-# TODO: Suggest setHDF5DumpDir() for HDF5Array
-setHDF5DumpDir <- function(dir = tempdir()) {
-    # TODO: A bunch of argument checks
-    assign("dir", dir, envir = HDF5Array:::.HDF5_dump_settings_envir)
-}
-
-getHDF5DumpDir <- function() {
-    get("dir", envir = HDF5Array:::.HDF5_dump_settings_envir)
-}
-
-.newBSseqHDF5Filename <- function() {
-    tempfile(pattern = "BSseq.", tmpdir = getHDF5DumpDir(), ".h5")
-}
-
 # Helper function used by BSseq()
 # TODO: Unit tests demonstrating equivalence of this to
 #       `any(M < 0) || any(M > Cov) || any(is.na(M)) ||

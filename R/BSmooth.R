@@ -149,20 +149,20 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
 
     rownames(coef) <- NULL
     colnames(coef) <- sampleNames(BSseq)
-    if(!is.null(se.coef)) {
+    if (!is.null(se.coef)) {
         rownames(se.coef) <- NULL
         colnames(se.coef) <- sampleNames(BSseq)
     }
 
-    if(!is.null(coef)) {
+    if (!is.null(coef)) {
         if (hdf5) {
-            coef <- HDF5Array(coef)
+            coef <- .safeHDF5Array(coef, "BSseq", "coef")
         }
         assay(BSseq, "coef") <- coef
     }
-    if(!is.null(se.coef)) {
+    if (!is.null(se.coef)) {
         if (hdf5) {
-            se.coef <- HDF5Array(se.coef)
+            se.coef <- .safeHDF5Array(se.coef, "BSseq", "se.coef")
         }
         assay(BSseq, "se.coef") <- se.coef
     }

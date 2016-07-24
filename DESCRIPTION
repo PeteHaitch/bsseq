@@ -1,5 +1,5 @@
 Package: bsseq
-Version: 1.9.1.9001
+Version: 1.9.1.9002
 Encoding: UTF-8
 Title: Analyze, manage and store bisulfite sequencing data
 Description: A collection of tools for analyzing and visualizing bisulfite
@@ -56,6 +56,7 @@ Collate:
     BSseqStat_class.R
     getStats.R
     RcppExports.R
+    hdf5-utils.R
 License: Artistic-2.0
 VignetteBuilder: knitr
 URL: https://github.com/kasperdanielhansen/bsseq
