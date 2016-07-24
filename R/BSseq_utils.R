@@ -19,18 +19,16 @@ collapseBSseq <- function(BSseq, columns, hdf5 = FALSE) {
     M <- do.call(cbind, lapply(sp, function(ss) {
         rowSums(getBSseq(BSseq, "M")[, ss, drop = FALSE])
     }))
-    if (hdf5) {
-        # TODO: Use bsseq:::.newBSseqHDF5Filename() and writeHDF5Dataset
-        M <- HDF5Array(M)
-    }
     Cov <- do.call(cbind, lapply(sp, function(ss) {
         rowSums(getBSseq(BSseq, "Cov")[, ss, drop = FALSE])
     }))
     if (hdf5) {
-        # TODO: Use bsseq:::.newBSseqHDF5Filename() and writeHDF5Dataset
-        Cov <- HDF5Array(Cov)
+        hdf5_file <- .newBSseqHDF5Filename()
+        M <- HDF5Array(writeHDF5Dataset(M, file = hdf5_file, name = "M"))
+        Cov <- HDF5Array(writeHDF5Dataset(M, file = hdf5_file, name = "Cov"))
     }
-    BSseq(gr = getBSseq(BSseq, "gr"), M = M, Cov = Cov, sampleNames = names(sp))
+    BSseq(gr = getBSseq(BSseq, "gr"), M = M, Cov = Cov,
+          sampleNames = names(sp), hdf5 = hdf5)
 }
 
 chrSelectBSseq <- function(BSseq, seqnames = NULL, order = FALSE) {
