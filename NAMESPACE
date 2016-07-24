@@ -25,16 +25,18 @@ importMethodsFrom(Biobase, "annotatedDataFrameFrom",
                   "pData", "pData<-",
                   "sampleNames", "sampleNames<-")
 importFrom(Biobase, "validMsg")
-importMethodsFrom(GenomeInfoDb, "seqlengths", "seqlengths<-", "seqinfo", "seqinfo<-",
-                  "seqnames", "seqnames<-", "seqlevels", "seqlevels<-")
+importMethodsFrom(GenomeInfoDb, "seqlengths", "seqlengths<-", "seqinfo",
+                  "seqinfo<-", "seqnames", "seqnames<-", "seqlevels",
+                  "seqlevels<-", "sortSeqlevels")
 import(S4Vectors)
 importFrom(gtools, "combinations")
-importFrom(data.table, "fread", "setnames", "setkey")
+importFrom(data.table, "fread", "setnames", "setkey", ":=", ".N")
 importFrom(R.utils, "isGzipped", "gunzip")
 import(limma)
 importFrom(permute, "shuffleSet", "how")
 import(HDF5Array)
 importFrom(Rcpp, "sourceCpp")
+importFrom("utils", "read.table")
 
 ##
 ## Exporting
