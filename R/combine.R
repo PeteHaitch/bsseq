@@ -20,7 +20,7 @@
     M <- lapply(seq_len(ncol(m)), function(j) {
         mm <- matrix(fill, nrow = nrow, ncol = 1L)
         mm[idx, 1L] <- as.array(m[, j, drop = FALSE])
-        .safeHDF5Array(mm, "BSseq", paste0("combineDelayedMatrix.", i, ".", j))
+        .safeHDF5Array(mm, "BSseq.", paste0("combineDelayedMatrix.", i, ".", j))
     })
     if (length(M) > 1) {
         M <- do.call(cbind, M)
@@ -245,7 +245,7 @@ setMethod("combine", signature(x = "BSseq", y = "BSseq"), function(x, y, ...) {
             j0 <- j0 + ncol(matrix_list[[j]])
         }
         if (hdf5) {
-            z <- .safeHDF5Array(z, "BSseq", "z")
+            z <- .safeHDF5Array(z, "BSseq.", "z")
         }
     } else if (any(is_DelayedMatrix) || hdf5) {
         # TODO: Could consider using mcmapply(), but (A) is it worth it? and
@@ -277,18 +277,18 @@ combineList <- function(x, ..., hdf5 = FALSE) {
     if (class(x) == "BSseq") {
         x <- list(x, ...)
     }
-    stopifnot(all(sapply(x, class) == "BSseq"))
+    stopifnot(all(vapply(x, class, character(1L)) == "BSseq"))
     gr <- getBSseq(x[[1]], "gr")
     trans <- getBSseq(x[[1]], "trans")
-    sameTrans <- sapply(x[-1], function(xx) {
+    sameTrans <- vapply(x[-1], function(xx) {
         identical(trans, getBSseq(xx, "trans"))
-    })
+    }, logical(1L))
     if (!all(sameTrans)) {
         stop("all elements of '...' in combineList needs to have the same trans")
     }
-    sameGr <- sapply(x[-1], function(xx) {
+    sameGr <- vapply(x[-1], function(xx) {
         identical(gr, getBSseq(xx, "gr"))
-    })
+    }, logical(1L))
     sampleNames <- do.call(c, unname(lapply(x, sampleNames)))
     if (length(sampleNames) > 1 &&
         length(Reduce(intersect, lapply(x, sampleNames))) != 0L) {
@@ -335,7 +335,7 @@ combineList <- function(x, ..., hdf5 = FALSE) {
                 assays(xx) <- mendoapply(function(a, an) {
                     # NOTE: Only convert those assays that need converting
                     if (is.matrix(a) && !is(a, "DelayedMatrix")) {
-                        a <- .safeHDF5Array(a, "BSseq", an)
+                        a <- .safeHDF5Array(a, "BSseq.", an)
                     }
                     a
                 }, a = assays(xx), an = assayNames(xx))
@@ -357,14 +357,9 @@ combineList <- function(x, ..., hdf5 = FALSE) {
         # TODO: This will create a very long intermediate GRanges object
         #       and takes a while to run when the objects are long and/or there
         #       are many objects; is there a way to achieve the same outcome
-        #       more efficiently (see commented code for a candidate)
+        #       more efficiently (sort is the slowest part)
         gr <- sort(reduce(do.call(c, unname(lapply(x, granges))),
                           min.gapwidth = 0L))
-        # gr <- sort(Reduce(function(x, y) reduce(c(x, y), min.gapwidth = 0L),
-        #                   unname(lapply(x[-1], granges)), init = granges(x[[1]])))
-        # TODO: Might be more efficient to compute elements of idx_list on the
-        #       fly (e.g., inside call to .combineListMatrixList()) since we
-        #       never simultaneously need all elements of idx_list
         idx_list <- lapply(x, function(xx) queryHits(findOverlaps(xx, gr)))
         nrow <- length(gr)
         ncol <- length(sampleNames)

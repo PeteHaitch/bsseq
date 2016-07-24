@@ -31,7 +31,7 @@ BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
     ##   rawSds <- fitC$sigma
     ##   cor.coefficients <- cov2cor(fitC$cov.coefficients)
     if (hdf5) {
-        rawSds <- .safeHDF5Array(as.matrix(fitC$sigma), "BSseq", "rawSds")
+        rawSds <- .safeHDF5Array(as.matrix(fitC$sigma), "BSseq.", "rawSds")
     } else {
         rawSds <- as.matrix(fitC$sigma)
     }
@@ -39,7 +39,7 @@ BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
     if (hdf5) {
         rawTstats <-
             .safeHDF5Array(fitC$coefficients / fitC$stdev.unscaled / fitC$sigma,
-                           "BSseq", "rawTstats")
+                           "BSseq.", "rawTstats")
     } else {
         rawTstats <- fitC$coefficients / fitC$stdev.unscaled / fitC$sigma
     }
@@ -85,7 +85,7 @@ smoothSds <- function(BSseqStat, k = 101, qSd = 0.75, mc.cores = 1,
                              .smoothSd(rawSds, k = k, qSd = qSd)
                          }, mc.cores = mc.cores))
     if (hdf5) {
-        smoothSds <- .safeHDF5Array(as.matrix(smoothSds), "BSseq", "smoothSds")
+        smoothSds <- .safeHDF5Array(as.matrix(smoothSds), "BSseq.", "smoothSds")
     } else {
         smoothSds <- as.matrix(smoothSds)
     }
@@ -120,7 +120,7 @@ computeStat <- function(BSseqStat, coef = NULL, hdf5 = FALSE) {
         stat.type <- "tstat"
     }
     if (hdf5) {
-        stat <- .safeHDF5Array(stat, "BSseq", stat)
+        stat <- .safeHDF5Array(stat, "BSseq.", stat)
     }
     if("stat" %in% names(getStats(BSseqStat))) {
         BSseqStat@stats[["stat"]] <- stat

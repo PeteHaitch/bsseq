@@ -33,7 +33,7 @@ BSmooth.tstat <- function(BSseq, group1, group2,
         yy - correction
     }
     estimate.var <- match.arg(estimate.var)
-    stopifnot(is(BSseq, "BSseq"))
+    stopifnot(is(BSseq, "BSseq."))
     stopifnot(hasBeenSmoothed(BSseq))
     if (is.character(group1)) {
         stopifnot(all(group1 %in% sampleNames(BSseq)))
@@ -99,10 +99,10 @@ BSmooth.tstat <- function(BSseq, group1, group2,
     if (hdf5) {
         group1.means <- .safeHDF5Array(
             as.matrix(rowMeans(allPs[, group1, drop = FALSE], na.rm = TRUE)),
-            "BSseq", "group1.means")
+            "BSseq.", "group1.means")
         group2.means <- .safeHDF5Array(
             as.matrix(rowMeans(allPs[, group2, drop = FALSE], na.rm = TRUE)),
-            "BSseq", "groups2.means")
+            "BSseq.", "groups2.means")
     } else {
         # NOTE: Preallocate stats to avoid copies that would otherwise
         #       occur when cbind()-ing vectors to form stats
@@ -165,10 +165,10 @@ BSmooth.tstat <- function(BSseq, group1, group2,
             as.matrix(do.call(c, mclapply(clusterIdx, function(idx) {
             scale * .smoothSd(rawSds[idx], k = k, qSd = qSd)
         }, mc.cores = mc.cores))),
-        "BSseq", "tstat.sd")
-        rawSds <- .safeHDF5Array(as.matrix(rawSds), "BSseq", "rawSds")
+        "BSseq.", "tstat.sd")
+        rawSds <- .safeHDF5Array(as.matrix(rawSds), "BSseq.", "rawSds")
         tstat <- .safeHDF5Array((group1.means - group2.means) / tstat.sd,
-                               "BSseq", "tstat")
+                               "BSseq.", "tstat")
     } else {
         stats[, "tstat.sd"] <- do.call(c, mclapply(clusterIdx, function(idx) {
             scale * .smoothSd(stats[idx, "rawSds"], k = k, qSd = qSd)
@@ -189,7 +189,7 @@ BSmooth.tstat <- function(BSseq, group1, group2,
                                               tstat = as.array(tstat),
                                               qSd = qSd,
                                               mc.cores = mc.cores))),
-                "BSseq", "tstat.corrected")
+                "BSseq.", "tstat.corrected")
         } else {
             stats[, "tstat.corrected"] <-
                 do.call(c, mclapply(clusterIdx,

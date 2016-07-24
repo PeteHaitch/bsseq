@@ -156,13 +156,13 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
 
     if (!is.null(coef)) {
         if (hdf5) {
-            coef <- .safeHDF5Array(coef, "BSseq", "coef")
+            coef <- .safeHDF5Array(coef, "BSseq.", "coef")
         }
         assay(BSseq, "coef") <- coef
     }
     if (!is.null(se.coef)) {
         if (hdf5) {
-            se.coef <- .safeHDF5Array(se.coef, "BSseq", "se.coef")
+            se.coef <- .safeHDF5Array(se.coef, "BSseq.", "se.coef")
         }
         assay(BSseq, "se.coef") <- se.coef
     }

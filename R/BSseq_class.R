@@ -235,13 +235,13 @@ BSseq <- function(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
         # TODO: If M (Cov, coef, se.coef) is already a HDF5-backed
         #       DelayedMatrix then probably want to avoid making a copy of it
         #       **provided that identical(grR, gr) is TRUE**
-        M <- .safeHDF5Array(M, "BSseq", "M")
-        Cov <- .safeHDF5Array(Cov, "BSseq", "Cov")
+        M <- .safeHDF5Array(M, "BSseq.", "M")
+        Cov <- .safeHDF5Array(Cov, "BSseq.", "Cov")
         if (!is.null(coef)) {
-            coef <- .safeHDF5Array(coef, "BSseq", "coef")
+            coef <- .safeHDF5Array(coef, "BSseq.", "coef")
         }
         if (!is.null(se.coef)) {
-            se.coef <- .safeHDF5Array(se.coef, "BSseq", "se.coef")
+            se.coef <- .safeHDF5Array(se.coef, "BSseq.", "se.coef")
         }
     }
     # Set dimnames of M, Cov, coef, and se.coef. Also check dimensionaity of
