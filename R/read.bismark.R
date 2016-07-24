@@ -1,5 +1,10 @@
 # TODO: Should hdf5 be the default? Should it guess/recommend the user switch
 #       to hdf5 if they have large/many files?
+# TODO: Could add a seqinfo argument to read.bismark() that could be used
+#       to ensure the output of read.bismark() was sorted. The default
+#       value would infer the seqinfo from the bismark input files,
+#       although this could not guarantee the final object returned by
+#       read.bismark() was sorted
 read.bismark <- function(files,
                          sampleNames,
                          rmZeroCov = FALSE,
@@ -75,7 +80,6 @@ read.bismark <- function(files,
     allOut
 }
 
-# TODO: Add same data.table wizardy as is used in read.bismarkCytosineRaw()
 read.bismarkCovRaw <- function(thisfile,
                                thisSampleName,
                                rmZeroCov,
@@ -98,15 +102,35 @@ read.bismarkCovRaw <- function(thisfile,
     }
     out <- fread(thisfile, header = FALSE, select = c(1, 2, 5, 6))
 
+    setnames(out, paste0("V", 1:4), c("seqnames", "pos", "M", "U"))
+    # NOTE: Sort out in place using data.table wizardy. This is technically a
+    #       breaking change (and should be documented) but one that I think is
+    #       worth introducing. Sort order is based on sortSeqlevels() and is
+    #       limited to individual files, i.e. there is no guarantee that the
+    #       object returned by read.bismark() is sorted.
+    # NOTE: Drop columns of 'out' once they are no longer required
+    seqlevels <- out[, sortSeqlevels(unique(seqnames))]
+    out[, "seqnames" := factor(seqnames, seqlevels)]
+    setkey(out, seqnames, pos)
+    seqnames <- out[, .N, by = seqnames]
+    out[, "seqnames" := NULL]
+    seqnames <- Rle(seqnames_strand[, seqnames], seqnames_strand[, N])
+    strand <- strand(Rle("*", nrow(out)))
+    M <- as.matrix(out[, M])
+    out[, M := NULL]
+    Cov <- M + out[, U]
+    out[, U := NULL]
     ## Create GRanges instance from 'out'
-    gr <- GRanges(seqnames = out[[1L]],
-                  ranges = IRanges(start = out[[2L]], width = 1L))
+    gr <- GRanges(seqnames = seqnames,
+                  ranges = IRanges(out[, pos], width = 1L),
+                  strand = strand)
+    out[, pos := NULL]
 
     ## Create BSseq instance from 'out'
     BSseq(gr = gr,
-          M = as.matrix(out[[5L]]),
-          Cov = as.matrix(out[[5L]] + out[[6L]]),
           sampleNames = thisSampleName,
+          M = M,
+          Cov = Cov,
           rmZeroCov = rmZeroCov,
           hdf5 = hdf5)
 }
@@ -139,16 +163,11 @@ read.bismarkCytosineReportRaw <- function(thisfile,
     }
     out <- fread(thisfile, header = FALSE, select = c(1, 2, 3, 4, 5))
     setnames(out, paste0("V", 1:5), c("seqnames", "pos", "strand", "M", "U"))
-    # TODO: Sort out in place using data.table wizardy. This is technically a
+    # NOTE: Sort out in place using data.table wizardy. This is technically a
     #       breaking change (and should be documented) but one that I think is
     #       worth introducing. Sort order is based on sortSeqlevels() and is
     #       limited to individual files, i.e. there is no guarantee that the
     #       object returned by read.bismark() is sorted.
-    # TODO: Could add a seqinfo argument to read.bismark() that could be used
-    #       to ensure the output of read.bismark() was sorted. The default
-    #       value would infer the seqinfo from the bismark input files,
-    #       although this could not guarantee the final object returned by
-    #       read.bismark() was sorted
     # NOTE: Drop columns of 'out' once they are no longer required
     seqlevels <- out[, sortSeqlevels(unique(seqnames))]
     out[, c("seqnames", "strand") :=
@@ -176,3 +195,5 @@ read.bismarkCytosineReportRaw <- function(thisfile,
           rmZeroCov = rmZeroCov,
           hdf5 = hdf5)
 }
+# NOTE: Required to quieten R CMD check
+globalVariables(c("N", "U"))
