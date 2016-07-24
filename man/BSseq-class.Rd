@@ -179,9 +179,11 @@ collapseBSseq(BStest, columns = c("A1" = "A", "A2" = "A", "A3" = "B"))
 
 # Using HDF5Array
 library(HDF5Array)
+# TODO: Clean this up
+bsseq:::setHDF5DumpDir(tempdir())
 M.hdf5 <- HDF5Array(M)
 BStest.hdf5 <- BSseq(pos = 1:3, chr = c("chr1", "chr2", "chr1"), M = M.hdf5,
-                     Cov = M.hdf5 + 2)
+                     Cov = M.hdf5 + 2, hdf5 = TRUE)
 chrSelectBSseq(BStest.hdf5, seqnames = "chr1", order = TRUE)
 collapseBSseq(BStest.hdf5, columns = c("A1" = "A", "A2" = "A", "A3" = "B"),
               hdf5 = TRUE)

@@ -70,6 +70,8 @@ BSseq(M = NULL, Cov = NULL, coef = NULL, se.coef = NULL,
 
   # Using HDF5Array
   library(HDF5Array)
+  # TODO: Tidy up
+  bsseq:::setHDF5DumpDir(tempdir())
   M.hdf5 <- HDF5Array(M)
   Cov.hdf5 <- HDF5Array(Cov)
   BS1.hdf5 <- BSseq(chr = c("chr1", "chr2", "chr1"), pos = c(1, 2, 3),
