@@ -355,3 +355,4 @@ mclapply(1:4, function(x) {
 - [ ] When ready for merge, document all changes by diffing against master
 - [ ] Remove HDF5 support for `read.umtab()` and other legacy formats (keeping them will only add to maintainence burden)
 - [ ] Minimise creations of `.h5` files by re-using a file iff its guaranteed to be safe
+- [ ] Switch out all `sapply()` for `vapply()`
