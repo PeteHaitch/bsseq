@@ -331,19 +331,27 @@ setMethod("updateObject", "BSseq",
 
 
 strandCollapse <- function(BSseq, shift = TRUE) {
-    if(all(runValue(strand(BSseq)) == "*")) {
+    if (all(runValue(strand(BSseq)) == "*")) {
         warning("All loci are unstranded; nothing to collapse")
         return(BSseq)
     }
-    if(!(all(runValue(strand(BSseq)) %in% c("+", "-"))))
+    if (!(all(runValue(strand(BSseq)) %in% c("+", "-")))) {
         stop("'BSseq' object has a mix of stranded and unstranded loci.")
+    }
     BS.forward <- BSseq[strand(BSseq) == "+"]
     strand(BS.forward) <- "*"
     BS.reverse <- BSseq[strand(BSseq) == "-"]
     strand(BS.reverse) <- "*"
-    if(shift)
+    if (shift) {
         rowRanges(BS.reverse) <- shift(granges(BS.reverse), -1L)
+    }
+    # NOTE: Need to rename both samplNames/colnames of overall object and of
+    #       assays otherwise errors will occur if they disagree
     sampleNames(BS.reverse) <- paste0(sampleNames(BS.reverse), "_REVERSE")
+    assays(BS.reverse) <- endoapply(assays(BS.reverse), function(a) {
+        dimnames(a) <- list(NULL, paste0(sampleNames(BS.reverse)))
+        a
+    })
     BS.comb <- combine(BS.forward, BS.reverse)
     newBSseq <- collapseBSseq(BS.comb, columns = rep(sampleNames(BSseq), 2))
     newBSseq
