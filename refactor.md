@@ -356,3 +356,4 @@ mclapply(1:4, function(x) {
 - [ ] Remove HDF5 support for `read.umtab()` and other legacy formats (keeping them will only add to maintainence burden)
 - [ ] Minimise creations of `.h5` files by re-using a file iff its guaranteed to be safe
 - [ ] Switch out all `sapply()` for `vapply()`
+- [ ] `assay(x, withDimnames = TRUE)` or `assay(x, withDimnames = TRUE)` doesn't appear to be working when assays are HDF5-backed; test
