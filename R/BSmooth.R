@@ -24,65 +24,6 @@ makeClusters <- function(hasGRanges, maxGap = 10 ^ 8) {
     clusterIdx
 }
 
-# NOTE: .smooth() realises M and Cov as array objects on a per-sample or
-#       per-chromosome basis (depending on value of `parallelBy` in call to
-#       BSmooth())
-.smooth <- function(idxes, sampleIdx) {
-    ## Assuming that idxes is a set of indexes into the BSseq object
-    ## sampleIdx is a single character
-    this_sample_chr <- c(sampleNames(BSseq)[sampleIdx],
-                         as.character(seqnames(BSseq)[idxes[1]]))
-    if (verbose >= 2) {
-        cat(sprintf("[BSmooth]   smoothing start: sample:%s, chr:%s, nLoci:%s\n",
-                    this_sample_chr[1], this_sample_chr[2], length(idxes)))
-    }
-    Cov <- getCoverage(BSseq, type = "Cov")[idxes, sampleIdx, drop = FALSE]
-    M <- getCoverage(BSseq, type = "M")[idxes, sampleIdx, drop = FALSE]
-    pos <- start(BSseq)[idxes]
-    stopifnot(all(diff(pos) > 0))
-    wh <- which(Cov != 0)
-    nn <- ns / length(wh)
-    if (length(wh) <= ns) {
-        if (keep.se) {
-            se.coef <- rep(NA_real_, length(Cov))
-        } else {
-            se.coef <- NULL
-        }
-        return(list(coef = rep(NA_real_, length(Cov)),
-                    se.coef = se.coef,
-                    trans = NULL, h = h, nn = nn))
-    }
-    # NOTE: At this point, it is much, much faster to realise M and Cov in
-    #       memory than it is to use delayed operations. Also, at this point,
-    #       M and Cov only contain data from a single sample/seqlevel, so are
-    #       generally quite a bit smaller than the full object
-    if (is(M, "DelayedArray") ) {
-        M <- as.array(M)
-    }
-    if (is(Cov, "DelayedArray")) {
-        Cov <- as.array(Cov)
-    }
-    sdata <- data.frame(pos = pos[wh],
-                        M = pmin(pmax(M[wh], 0.01), Cov[wh] - 0.01),
-                        Cov = Cov[wh])
-    fit <- locfit(M ~ lp(pos, nn = nn, h = h), data = sdata,
-                  weights = Cov, family = "binomial", maxk = 10000)
-    pp <- preplot(fit, where = "data", band = "local",
-                  newdata = data.frame(pos = pos))
-    if (keep.se) {
-        se.coef <- pp$se.fit
-    } else {
-        se.coef <- NULL
-    }
-    if (verbose >= 2) {
-        cat(sprintf("[BSmooth]   smoothing end: sample:%s, chr:%s, nLoci:%s, nCoveredLoci:%s\n",
-                    this_sample_chr[1], this_sample_chr[2], length(idxes),
-                    nrow(sdata)))
-    }
-    return(list(coef = pp$fit, se.coef = se.coef, trans = pp$trans, h = h,
-                nn = nn))
-}
-
 # TODO: Should hdf5 be the default? Should it guess/recommend the user switch
 #       to hdf5 if they have large/many files?
 # NOTE: hdf5 = TRUE only affects assays created by BSmooth(), i.e. the `coef`
@@ -91,6 +32,66 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
                     parallelBy = c("sample", "chromosome"),
                     mc.preschedule = FALSE, mc.cores = 1, keep.se = FALSE,
                     verbose = TRUE, hdf5 = FALSE) {
+    # NOTE: .smooth() realises M and Cov as array objects on a per-sample or
+    #       per-chromosome basis (depending on value of `parallelBy` in call to
+    #       BSmooth())
+    .smooth <- function(idxes, sampleIdx) {
+        ## Assuming that idxes is a set of indexes into the BSseq object
+        ## sampleIdx is a single character
+        this_sample_chr <- c(sampleNames(BSseq)[sampleIdx],
+                             as.character(seqnames(BSseq)[idxes[1]]))
+        if (verbose >= 2) {
+            cat(sprintf("[BSmooth]   smoothing start: sample:%s, chr:%s, nLoci:%s\n",
+                        this_sample_chr[1], this_sample_chr[2], length(idxes)))
+        }
+        Cov <- getCoverage(BSseq, type = "Cov")[idxes, sampleIdx, drop = FALSE]
+        M <- getCoverage(BSseq, type = "M")[idxes, sampleIdx, drop = FALSE]
+        pos <- start(BSseq)[idxes]
+        stopifnot(all(diff(pos) > 0))
+        wh <- which(Cov != 0)
+        nn <- ns / length(wh)
+        if (length(wh) <= ns) {
+            if (keep.se) {
+                se.coef <- rep(NA_real_, length(Cov))
+            } else {
+                se.coef <- NULL
+            }
+            return(list(coef = rep(NA_real_, length(Cov)),
+                        se.coef = se.coef,
+                        trans = NULL, h = h, nn = nn))
+        }
+        # NOTE: At this point, it is much, much faster to realise M and Cov in
+        #       memory than it is to use delayed operations. Also, at this point,
+        #       M and Cov only contain data from a single sample/seqlevel, so are
+        #       generally quite a bit smaller than the full object
+        if (is(M, "DelayedArray") ) {
+            M <- as.array(M)
+        }
+        if (is(Cov, "DelayedArray")) {
+            Cov <- as.array(Cov)
+        }
+        sdata <- data.frame(pos = pos[wh],
+                            M = pmin(pmax(M[wh], 0.01), Cov[wh] - 0.01),
+                            Cov = Cov[wh])
+        fit <- locfit(M ~ lp(pos, nn = nn, h = h), data = sdata,
+                      weights = Cov, family = "binomial", maxk = 10000)
+        pp <- preplot(fit, where = "data", band = "local",
+                      newdata = data.frame(pos = pos))
+        if (keep.se) {
+            se.coef <- pp$se.fit
+        } else {
+            se.coef <- NULL
+        }
+        if (verbose >= 2) {
+            cat(sprintf("[BSmooth]   smoothing end: sample:%s, chr:%s, nLoci:%s, nCoveredLoci:%s\n",
+                        this_sample_chr[1], this_sample_chr[2], length(idxes),
+                        nrow(sdata)))
+        }
+        # UP TO HERE: .smooth() could inherit `hdf5` and write `coef`` and
+        #             `se.coef` to disk to reduce memory footprint
+        return(list(coef = pp$fit, se.coef = se.coef, trans = pp$trans, h = h,
+                    nn = nn))
+    }
     stopifnot(class(BSseq) == "BSseq")
     parallelBy <- match.arg(parallelBy)
     if (verbose) {
@@ -112,13 +113,25 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
             cat(sprintf("[BSmooth] smoothing by 'sample' (mc.cores = %d, mc.preschedule = %s)\n",
                                 mc.cores, mc.preschedule))
         }
-        out <- mclapply(seq(along = sampleNames), function(sIdx) {
+        out <- mclapply(seq_along(sampleNames), function(sIdx) {
             ptime1 <- proc.time()
             tmp <- lapply(clusterIdx, function(jj) {
                 try(.smooth(idxes = jj, sampleIdx = sIdx))
             })
             coef <- do.call(c, lapply(tmp, function(xx) xx$coef))
+            if (!is.null(coef)) {
+                # UP TO HERE: Testing 2016-07-25 re writing .h5 files once vs. often
+                if (hdf5) {
+                    coef <- .safeHDF5Array(coef, "BSseq.", "coef")
+                }
+            }
             se.coef <- do.call(c, lapply(tmp, function(xx) xx$se.coef))
+            if (!is.null(se.coef)) {
+                # UP TO HERE: Testing 2016-07-25 re writing .h5 files once vs. often
+                if (hdf5) {
+                    se.coef <- .safeHDF5Array(coef, "BSseq.", "se.coef")
+                }
+            }
             ptime2 <- proc.time()
             stime <- (ptime2 - ptime1)[3]
             if (verbose) {
@@ -127,8 +140,9 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
             }
             return(list(coef = coef, se.coef = se.coef))
         }, mc.preschedule = mc.preschedule, mc.cores = mc.cores)
-        if (any(vapply(out, is, logical(1L), class2 = "try-error")))
+        if (any(vapply(out, is, logical(1L), class2 = "try-error"))) {
             stop("BSmooth encountered smoothing errors")
+        }
         coef <- do.call(cbind, lapply(out, function(xx) xx$coef))
         se.coef <- do.call(cbind, lapply(out, function(xx) xx$se.coef))
     }, "chromosome" = {
@@ -136,13 +150,25 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
             cat(sprintf("[BSmooth] smoothing by 'chromosome' (mc.cores = %d, mc.preschedule = %s)\n",
                                 mc.cores, mc.preschedule))
         }
-        out <- mclapply(1:length(clusterIdx), function(ii) {
+        out <- mclapply(seq_along(clusterIdx), function(ii) {
             ptime1 <- proc.time()
             tmp <- lapply(seq(along = sampleNames), function(sIdx) {
-                smooth(idxes = clusterIdx[[ii]], sampleIdx = sIdx)
+                .smooth(idxes = clusterIdx[[ii]], sampleIdx = sIdx)
             })
             coef <- do.call(cbind, lapply(tmp, function(xx) xx$coef))
+            if (!is.null(coef)) {
+                # UP TO HERE: Testing 2016-07-25 re writing .h5 files once vs. often
+                if (hdf5) {
+                    coef <- .safeHDF5Array(coef, "BSseq.", "coef")
+                }
+            }
             se.coef <- do.call(cbind, lapply(tmp, function(xx) xx$se.coef))
+            if (!is.null(se.coef)) {
+                # UP TO HERE: Testing 2016-07-25 re writing .h5 files once vs. often
+                if (hdf5) {
+                    se.coef <- .safeHDF5Array(coef, "BSseq.", "se.coef")
+                }
+            }
             ptime2 <- proc.time()
             stime <- (ptime2 - ptime1)[3]
             if (verbose) {
@@ -170,15 +196,17 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
     }
 
     if (!is.null(coef)) {
-        if (hdf5) {
-            coef <- .safeHDF5Array(coef, "BSseq.", "coef")
-        }
+        # UP TO HERE: Testing 2016-07-25 re writing .h5 files once vs. often
+        # if (hdf5) {
+        #     coef <- .safeHDF5Array(coef, "BSseq.", "coef")
+        # }
         assay(BSseq, "coef") <- coef
     }
     if (!is.null(se.coef)) {
-        if (hdf5) {
-            se.coef <- .safeHDF5Array(se.coef, "BSseq.", "se.coef")
-        }
+        # UP TO HERE: Testing 2016-07-25 re writing .h5 files once vs. often
+        # if (hdf5) {
+        #     se.coef <- .safeHDF5Array(se.coef, "BSseq.", "se.coef")
+        # }
         assay(BSseq, "se.coef") <- se.coef
     }
     # NOTE: The commented out version of mytrans() is equivalent to the new one.
