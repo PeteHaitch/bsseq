@@ -33,7 +33,7 @@ BSmooth.tstat <- function(BSseq, group1, group2,
         yy - correction
     }
     estimate.var <- match.arg(estimate.var)
-    stopifnot(is(BSseq, "BSseq."))
+    stopifnot(is(BSseq, "BSseq"))
     stopifnot(hasBeenSmoothed(BSseq))
     if (is.character(group1)) {
         stopifnot(all(group1 %in% sampleNames(BSseq)))
