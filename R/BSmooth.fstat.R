@@ -182,6 +182,10 @@ fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
     bstat <- smoothSds(bstat, hdf5 = hdf5)
     bstat <- computeStat(bstat, coef = coef, hdf5 = hdf5)
     dmrs <- dmrFinder(bstat, cutoff = cutoff, maxGap = maxGap.dmr)
+    if (is.null(dmrs)) {
+        stop("No DMRs identified. Consider reducing the 'cutoff' from (",
+             paste0(cutoff, collapse = ", "), ")")
+    }
     idxMatrix <- permuteAll(nperm, design)
     nullDist <- getNullDistribution_BSmooth.fstat(BSseq = BSseq,
                                                   idxMatrix = idxMatrix,
