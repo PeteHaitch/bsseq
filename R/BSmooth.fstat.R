@@ -63,6 +63,79 @@ BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
     out
 }
 
+# NOTE: y should be transposed, i.e., samples as rows and loci as columns
+.bsseq.lm.fit <- function(y, design, contrasts) {
+    fit <- .lmFit(y, design)
+    contrasts.fit(fit, contrasts)
+}
+
+.BSmooth.fstat.workhorse <- function(tAllPs, design, contrasts, parameters,
+                                     verbose = TRUE, hdf5 = FALSE) {
+    ptime1 <- proc.time()
+    if (is(tAllPs, "DelayedMatrix")) {
+        tAllPs <- as.array(tAllPs)
+    }
+    fitC <- .bsseq.lm.fit(tAllPs, design, contrasts)
+    ## Need
+    ##   fitC$coefficients, fitC$stdev.unscaled, fitC$sigma, fitC$cov.coefficients
+    ## actuall just need
+    ##   tstats <- fitC$coefficients / fitC$stdev.unscaled / fitC$sigma
+    ##   rawSds <- fitC$sigma
+    ##   cor.coefficients <- cov2cor(fitC$cov.coefficients)
+    if (hdf5) {
+        rawSds <- .safeHDF5Array(as.matrix(fitC$sigma), "BSseq.", "rawSds")
+    } else {
+        rawSds <- as.matrix(fitC$sigma)
+    }
+    cor.coefficients <- cov2cor(fitC$cov.coefficients)
+    if (hdf5) {
+        rawTstats <-
+            .safeHDF5Array(fitC$coefficients / fitC$stdev.unscaled / fitC$sigma,
+                           "BSseq.", "rawTstats")
+    } else {
+        rawTstats <- fitC$coefficients / fitC$stdev.unscaled / fitC$sigma
+    }
+    names(dimnames(rawTstats)) <- NULL
+    ptime2 <- proc.time()
+    stime <- (ptime2 - ptime1)[3]
+    if (verbose) {
+        cat(sprintf("done in %.1f sec\n", stime))
+    }
+
+    parameters <- c(parameters, list(design = design, contrasts = contrasts))
+    # NOTE: rawSds and rawTstats are both vectors with length = nrow(BSseq),
+    #       cor.coefficients is a n x n matrix, where n = ncol(contrasts);
+    #       the first two *may* benefit from being stored as HDF5-backed
+    #       column matrices, but the savings are minor since this scales with
+    #       nrow(BSseq) rather than ncol(BSseq)
+    stats <- list(rawSds = rawSds,
+                  cor.coefficients = cor.coefficients,
+                  rawTstats = rawTstats)
+    BSseqStat(gr = rowRanges(BSseq),  stats = stats, parameters = parameters)
+}
+
+# An optimised BSmooth.fstat()
+.BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
+                           hdf5 = FALSE) {
+    stopifnot(is(BSseq, "BSseq"))
+    stopifnot(hasBeenSmoothed(BSseq))
+
+    ## if(any(rowSums(getCoverage(BSseq)[, unlist(groups)]) == 0))
+    ##     warning("Computing t-statistics at locations where there is no data; consider subsetting the 'BSseq' object first")
+
+    if (verbose) {
+        cat("[BSmooth.fstat] fitting linear models ... ")
+    }
+    tAllPs <- t(getMeth(BSseq, type = "smooth", what = "perBase",
+                        confint = FALSE))
+    .BSmooth.fstat.workhorse(tallPs = tAllPs,
+                             design = design,
+                             contrasts = contrasts,
+                             parameters = BSseq@parameters,
+                             verbose = verbose,
+                             hdf5 = hdf5)
+}
+
 # NOTE: hdf5 = TRUE only affects output created by smoothSds(), i.e. the
 #       column vector `smoothSds`
 smoothSds <- function(BSseqStat, k = 101, qSd = 0.75, mc.cores = 1,
@@ -103,7 +176,7 @@ globalVariables("tstat")
 #       column vector `smoothSds`
 computeStat <- function(BSseqStat, coef = NULL, hdf5 = FALSE) {
     stopifnot(is(BSseqStat, "BSseqStat"))
-    if(is.null(coef)) {
+    if (is.null(coef)) {
         coef <- 1:ncol(getStats(BSseqStat, what = "rawTstats"))
     }
     tstats <- getStats(BSseqStat, what = "rawTstats")[, coef, drop = FALSE]
@@ -204,6 +277,59 @@ fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
     dmrs$maxDiff <- rowMaxs(meth) - rowMins(meth)
     list(bstat = bstat, dmrs = dmrs, idxMatrix = idxMatrix, nullDist = nullDist)
 }
+
+# (WIP) An optimised .fstat.pipeline()
+# TODO: How should the hdf5 argument work? Probably don't want to write all
+#       outputs to disk
+.fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
+                            coef = NULL, maxGap.sd = 10 ^ 8, maxGap.dmr = 300,
+                            mc.cores = 1, hdf5 = FALSE) {
+    stopifnot(is(BSseq, "BSseq"))
+    stopifnot(hasBeenSmoothed(BSseq))
+    # TODO: It may be more efficient to create a new .h5 file for tAllPs rather
+    #       than have to transpose as its reaised each time
+    tAllPs <- t(getMeth(BSseq, type = "smooth", what = "perBase",
+                        confint = FALSE))
+    bstat <- .BSmooth.fstat.workhorse(tAllPs = tAllPs,
+                                      design = design,
+                                      contrasts = contrasts,
+                                      parameters = BSseq@parameters,
+                                      verbose = verbose,
+                                      hdf5 = hdf5)
+    # UP TO HERE: Look for optimisations in smoothSds() and then continue
+    #             stepping through line-by-line.
+    bstat <- smoothSds(bstat, hdf5 = hdf5)
+    bstat <- computeStat(bstat, coef = coef, hdf5 = hdf5)
+    dmrs <- dmrFinder(bstat, cutoff = cutoff, maxGap = maxGap.dmr)
+    if (is.null(dmrs)) {
+        stop("No DMRs identified. Consider reducing the 'cutoff' from (",
+             paste0(cutoff, collapse = ", "), ")")
+    }
+    idxMatrix <- permuteAll(nperm, design)
+    if (nrow(idxMatrix) < nperm) {
+        warning(paste0("Only ", nrow(idxMatrix), " permutations possible ",
+                       "(requested ", nperm), " permutations)")
+    }
+    # TODO: Write .getNullDistribution_BSmooth.fstat() that uses tAllPs rather
+    #       than BSseq
+    nullDist <- .getNullDistribution_BSmooth.fstat(BSseq = BSseq,
+                                                   idxMatrix = idxMatrix,
+                                                   design = design,
+                                                   contrasts = contrasts,
+                                                   coef = coef,
+                                                   cutoff = cutoff,
+                                                   maxGap.sd = maxGap.sd,
+                                                   maxGap.dmr = maxGap.dmr,
+                                                   mc.cores = mc.cores)
+    fwer <- getFWER.fstat(null = c(list(dmrs), nullDist), type = "dmrs")
+    dmrs$fwer <- fwer
+    meth <- getMeth(BSseq, regions = dmrs, what = "perRegion")
+    meth <- t(apply(meth, 1, function(xx) tapply(xx, fac, mean)))
+    dmrs <- cbind(dmrs, meth)
+    dmrs$maxDiff <- rowMaxs(meth) - rowMins(meth)
+    list(bstat = bstat, dmrs = dmrs, idxMatrix = idxMatrix, nullDist = nullDist)
+}
+
 
 fstat.comparisons.pipeline <- function(BSseq, design, contrasts, cutoff, fac,
                                        maxGap.sd = 10 ^ 8, maxGap.dmr = 300,
