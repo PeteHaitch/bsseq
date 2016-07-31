@@ -1,69 +1,5 @@
-# TODO: The stats matrix *may* benefit from being stored as HDF5-backed matrix,
-#       but the saving is minor since this scales with nrow(BSseq) rather than
-#       ncol(BSseq); discuss with Kasper.
-BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
-                          hdf5 = FALSE) {
-    stopifnot(is(BSseq, "BSseq"))
-    stopifnot(hasBeenSmoothed(BSseq))
-
-    ## if(any(rowSums(getCoverage(BSseq)[, unlist(groups)]) == 0))
-    ##     warning("Computing t-statistics at locations where there is no data; consider subsetting the 'BSseq' object first")
-
-    if(verbose) cat("[BSmooth.fstat] fitting linear models ... ")
-    ptime1 <- proc.time()
-    allPs <- getMeth(BSseq, type = "smooth", what = "perBase",
-                     confint = FALSE)
-    if (is(allPs, "DelayedMatrix")) {
-        # NOTE: Need to realise `allPs` as an array since we use
-        #       limma::lmFit(allPs, design); actually, lmFit will do this
-        #       internally via a call to as.matrix, but we explicitly do this
-        #       ourselves to protect ourselves against changes to the internals
-        #       of lmFit().
-        allPs <- as.array(allPs)
-    }
-
-    fit <- lmFit(allPs, design)
-    fitC <- contrasts.fit(fit, contrasts)
-    ## Need
-    ##   fitC$coefficients, fitC$stdev.unscaled, fitC$sigma, fitC$cov.coefficients
-    ## actuall just need
-    ##   tstats <- fitC$coefficients / fitC$stdev.unscaled / fitC$sigma
-    ##   rawSds <- fitC$sigma
-    ##   cor.coefficients <- cov2cor(fitC$cov.coefficients)
-    if (hdf5) {
-        rawSds <- .safeHDF5Array(as.matrix(fitC$sigma), "BSseq.", "rawSds")
-    } else {
-        rawSds <- as.matrix(fitC$sigma)
-    }
-    cor.coefficients <- cov2cor(fitC$cov.coefficients)
-    if (hdf5) {
-        rawTstats <-
-            .safeHDF5Array(fitC$coefficients / fitC$stdev.unscaled / fitC$sigma,
-                           "BSseq.", "rawTstats")
-    } else {
-        rawTstats <- fitC$coefficients / fitC$stdev.unscaled / fitC$sigma
-    }
-    names(dimnames(rawTstats)) <- NULL
-    ptime2 <- proc.time()
-    stime <- (ptime2 - ptime1)[3]
-    if(verbose) cat(sprintf("done in %.1f sec\n", stime))
-
-    parameters <- c(BSseq@parameters,
-                    list(design = design, contrasts = contrasts))
-    # NOTE: rawSds and rawTstats are both vectors with length = nrow(BSseq),
-    #       cor.coefficients is a n x n matrix, where n = ncol(contrasts);
-    #       the first two *may* benefit from being stored as HDF5-backed
-    #       column matrices, but the savings are minor since this scales with
-    #       nrow(BSseq) rather than ncol(BSseq)
-    stats <- list(rawSds = rawSds,
-                  cor.coefficients = cor.coefficients,
-                  rawTstats = rawTstats)
-    out <- BSseqStat(gr = rowRanges(BSseq),
-                     stats = stats, parameters = parameters)
-    out
-}
-
-# NOTE: y should be transposed, i.e., samples as rows and loci as columns
+# NOTE: y should be transposed from its normal orientation, i.e., samples as
+#       rows and loci as columns
 .bsseq.lm.fit <- function(y, design, contrasts) {
     fit <- .lmFit(y, design)
     contrasts.fit(fit, contrasts)
@@ -114,9 +50,11 @@ BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
     BSseqStat(gr = rowRanges(BSseq),  stats = stats, parameters = parameters)
 }
 
-# An optimised BSmooth.fstat()
-.BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
-                           hdf5 = FALSE) {
+# TODO: The stats matrix *may* benefit from being stored as HDF5-backed matrix,
+#       but the saving is minor since this scales with nrow(BSseq) rather than
+#       ncol(BSseq); discuss with Kasper.
+BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
+                          hdf5 = FALSE) {
     stopifnot(is(BSseq, "BSseq"))
     stopifnot(hasBeenSmoothed(BSseq))
 
@@ -128,7 +66,7 @@ BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
     }
     tAllPs <- t(getMeth(BSseq, type = "smooth", what = "perBase",
                         confint = FALSE))
-    .BSmooth.fstat.workhorse(tallPs = tAllPs,
+    .BSmooth.fstat.workhorse(tAllPs = tAllPs,
                              design = design,
                              contrasts = contrasts,
                              parameters = BSseq@parameters,
@@ -139,22 +77,29 @@ BSmooth.fstat <- function(BSseq, design, contrasts, verbose = TRUE,
 # NOTE: hdf5 = TRUE only affects output created by smoothSds(), i.e. the
 #       column vector `smoothSds`
 smoothSds <- function(BSseqStat, k = 101, qSd = 0.75, mc.cores = 1,
-                      maxGap = 10^8, verbose = TRUE, hdf5 = FALSE) {
-    if(is.null(maxGap))
+                      maxGap = 10 ^ 8, verbose = TRUE, hdf5 = FALSE) {
+    if (is.null(maxGap)) {
         maxGap <- BSseqStat@parameters[["maxGap"]]
-    if(is.null(maxGap))
+    }
+    if (is.null(maxGap)) {
         stop("need to set argument 'maxGap'")
-    if(verbose) cat("[smoothSds] preprocessing ... ")
+    }
+    if (verbose) {
+        cat("[smoothSds] preprocessing ... ")
+    }
     ptime1 <- proc.time()
     clusterIdx <- makeClusters(granges(BSseqStat), maxGap = maxGap)
     ptime2 <- proc.time()
     stime <- (ptime2 - ptime1)[3]
-    if(verbose) cat(sprintf("done in %.1f sec\n", stime))
+    if (verbose) {
+        cat(sprintf("done in %.1f sec\n", stime))
+    }
     smoothSds <- do.call("c",
                          mclapply(clusterIdx, function(idx) {
                              # NOTE: Need to realise rawSds as an array because
                              #       .smoothSds() works with in-memory data
-                             rawSds <- as.array(getStats(BSseqStat, what = "rawSds")[idx, ])
+                             rawSds <- as.array(
+                                 getStats(BSseqStat, what = "rawSds")[idx, ])
                              .smoothSd(rawSds, k = k, qSd = qSd)
                          }, mc.cores = mc.cores))
     if (hdf5) {
@@ -162,10 +107,11 @@ smoothSds <- function(BSseqStat, k = 101, qSd = 0.75, mc.cores = 1,
     } else {
         smoothSds <- as.matrix(smoothSds)
     }
-    if("smoothSds" %in% names(getStats(BSseqStat)))
+    if ("smoothSds" %in% names(getStats(BSseqStat))) {
         BSseqStat@stats[["smoothSds"]] <- smoothSds
-    else
+    } else {
         BSseqStat@stats <- c(getStats(BSseqStat), list(smoothSds = smoothSds))
+    }
     BSseqStat
 }
 
@@ -177,14 +123,15 @@ globalVariables("tstat")
 computeStat <- function(BSseqStat, coef = NULL, hdf5 = FALSE) {
     stopifnot(is(BSseqStat, "BSseqStat"))
     if (is.null(coef)) {
-        coef <- 1:ncol(getStats(BSseqStat, what = "rawTstats"))
+        coef <- seq_len(ncol(getStats(BSseqStat, what = "rawTstats")))
     }
     tstats <- getStats(BSseqStat, what = "rawTstats")[, coef, drop = FALSE]
-    tstats <- tstats * getStats(BSseqStat, what = "rawSds") /
-        getStats(BSseqStat, what = "smoothSds")
-    if(length(coef) > 1) {
+    tstats <- tstats * getStats(BSseqStat, what = "rawSds")[, 1L] /
+        getStats(BSseqStat, what = "smoothSds")[, 1L]
+    if (length(coef) > 1) {
         # TODO: Need to check this branch
-        cor.coefficients <- getStats(BSseqStat, what = "cor.coefficients")[coef,coef]
+        cor.coefficients <- getStats(BSseqStat,
+                                     what = "cor.coefficients")[coef, coef]
         stat <- as.numeric(classifyTestsF(tstats, cor.coefficients,
                                           fstat.only = TRUE))
         stat.type <- "fstat"
@@ -195,7 +142,7 @@ computeStat <- function(BSseqStat, coef = NULL, hdf5 = FALSE) {
     if (hdf5) {
         stat <- .safeHDF5Array(stat, "BSseq.", stat)
     }
-    if("stat" %in% names(getStats(BSseqStat))) {
+    if ("stat" %in% names(getStats(BSseqStat))) {
         BSseqStat@stats[["stat"]] <- stat
         BSseqStat@stats[["stat.type"]] <- stat.type
     } else {
@@ -247,12 +194,25 @@ computeStat <- function(BSseqStat, coef = NULL, hdf5 = FALSE) {
 #     BSseqTstat
 # }
 
+# TODO: How should the hdf5 argument work? Probably don't want to write all
+#       outputs to disk
 fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
                            coef = NULL, maxGap.sd = 10 ^ 8, maxGap.dmr = 300,
                            mc.cores = 1, hdf5 = FALSE) {
-    bstat <- BSmooth.fstat(BSseq = BSseq, design = design,
-                           contrasts = contrasts, hdf5 = hdf5)
+    stopifnot(is(BSseq, "BSseq"))
+    stopifnot(hasBeenSmoothed(BSseq))
+    # TODO: It may be more efficient to create a new .h5 file for tAllPs rather
+    #       than have to transpose as its reaised each time
+    tAllPs <- t(getMeth(BSseq, type = "smooth", what = "perBase",
+                        confint = FALSE))
+    bstat <- .BSmooth.fstat.workhorse(tAllPs = tAllPs,
+                                      design = design,
+                                      contrasts = contrasts,
+                                      parameters = BSseq@parameters,
+                                      hdf5 = hdf5)
     bstat <- smoothSds(bstat, hdf5 = hdf5)
+    # UP TO HERE: Look for optimisations in computeStat() and then continue
+    #             stepping through line-by-line.
     bstat <- computeStat(bstat, coef = coef, hdf5 = hdf5)
     dmrs <- dmrFinder(bstat, cutoff = cutoff, maxGap = maxGap.dmr)
     if (is.null(dmrs)) {
@@ -260,6 +220,11 @@ fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
              paste0(cutoff, collapse = ", "), ")")
     }
     idxMatrix <- permuteAll(nperm, design)
+    if (nrow(idxMatrix) < nperm) {
+        warning(paste0("Only ", nrow(idxMatrix), " unique permutations exist ",
+                       "(requested ", nperm), " permutations)")
+        nperm <- nrow(idxMatrix)
+    }
     nullDist <- getNullDistribution_BSmooth.fstat(BSseq = BSseq,
                                                   idxMatrix = idxMatrix,
                                                   design = design,
@@ -277,59 +242,6 @@ fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
     dmrs$maxDiff <- rowMaxs(meth) - rowMins(meth)
     list(bstat = bstat, dmrs = dmrs, idxMatrix = idxMatrix, nullDist = nullDist)
 }
-
-# (WIP) An optimised .fstat.pipeline()
-# TODO: How should the hdf5 argument work? Probably don't want to write all
-#       outputs to disk
-.fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
-                            coef = NULL, maxGap.sd = 10 ^ 8, maxGap.dmr = 300,
-                            mc.cores = 1, hdf5 = FALSE) {
-    stopifnot(is(BSseq, "BSseq"))
-    stopifnot(hasBeenSmoothed(BSseq))
-    # TODO: It may be more efficient to create a new .h5 file for tAllPs rather
-    #       than have to transpose as its reaised each time
-    tAllPs <- t(getMeth(BSseq, type = "smooth", what = "perBase",
-                        confint = FALSE))
-    bstat <- .BSmooth.fstat.workhorse(tAllPs = tAllPs,
-                                      design = design,
-                                      contrasts = contrasts,
-                                      parameters = BSseq@parameters,
-                                      verbose = verbose,
-                                      hdf5 = hdf5)
-    # UP TO HERE: Look for optimisations in smoothSds() and then continue
-    #             stepping through line-by-line.
-    bstat <- smoothSds(bstat, hdf5 = hdf5)
-    bstat <- computeStat(bstat, coef = coef, hdf5 = hdf5)
-    dmrs <- dmrFinder(bstat, cutoff = cutoff, maxGap = maxGap.dmr)
-    if (is.null(dmrs)) {
-        stop("No DMRs identified. Consider reducing the 'cutoff' from (",
-             paste0(cutoff, collapse = ", "), ")")
-    }
-    idxMatrix <- permuteAll(nperm, design)
-    if (nrow(idxMatrix) < nperm) {
-        warning(paste0("Only ", nrow(idxMatrix), " permutations possible ",
-                       "(requested ", nperm), " permutations)")
-    }
-    # TODO: Write .getNullDistribution_BSmooth.fstat() that uses tAllPs rather
-    #       than BSseq
-    nullDist <- .getNullDistribution_BSmooth.fstat(BSseq = BSseq,
-                                                   idxMatrix = idxMatrix,
-                                                   design = design,
-                                                   contrasts = contrasts,
-                                                   coef = coef,
-                                                   cutoff = cutoff,
-                                                   maxGap.sd = maxGap.sd,
-                                                   maxGap.dmr = maxGap.dmr,
-                                                   mc.cores = mc.cores)
-    fwer <- getFWER.fstat(null = c(list(dmrs), nullDist), type = "dmrs")
-    dmrs$fwer <- fwer
-    meth <- getMeth(BSseq, regions = dmrs, what = "perRegion")
-    meth <- t(apply(meth, 1, function(xx) tapply(xx, fac, mean)))
-    dmrs <- cbind(dmrs, meth)
-    dmrs$maxDiff <- rowMaxs(meth) - rowMins(meth)
-    list(bstat = bstat, dmrs = dmrs, idxMatrix = idxMatrix, nullDist = nullDist)
-}
-
 
 fstat.comparisons.pipeline <- function(BSseq, design, contrasts, cutoff, fac,
                                        maxGap.sd = 10 ^ 8, maxGap.dmr = 300,

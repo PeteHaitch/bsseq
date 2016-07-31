@@ -75,7 +75,7 @@ BSmooth.tstat <- function(BSseq, group1, group2,
     }
     if (verbose) cat("[BSmooth.tstat] preprocessing ... ")
     ptime1 <- proc.time()
-    clusterIdx <- makeClusters(BSseq, maxGap = maxGap)
+    clusterIdx <- makeClusters(granges(BSseq), maxGap = maxGap)
     ptime2 <- proc.time()
     stime <- (ptime2 - ptime1)[3]
     if (verbose) cat(sprintf("done in %.1f sec\n", stime))

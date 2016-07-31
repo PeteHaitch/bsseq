@@ -62,8 +62,10 @@ setMethod("assayNames", "BSseq",
 #'
 #' @return A vector of length equal to the length of the Sds
 .smoothSd <- function(Sds, k, qSd) {
-    k0 <- floor(k/2)
-    if (all(is.na(Sds))) return(Sds)
+    k0 <- floor(k / 2)
+    if (all(is.na(Sds))) {
+        return(Sds)
+    }
     thresSD <- pmax(Sds, quantile(Sds, qSd, na.rm = TRUE), na.rm = TRUE)
     addSD <- rep(median(Sds, na.rm = TRUE), k0)
     sSds <- as.vector(runmean(Rle(c(addSD, thresSD, addSD)), k = k))

@@ -1,11 +1,12 @@
 dmrFinder <- function(bstat, cutoff = NULL, qcutoff = c(0.025, 0.975),
                       maxGap = 300, stat = "tstat.corrected", verbose = TRUE) {
-    if(is(bstat, "BSseqTstat")) {
-        if(! stat %in% colnames(bstat@stats))
+    if (is(bstat, "BSseqTstat")) {
+        if (!stat %in% colnames(bstat@stats)) {
             stop("'stat' needs to be a column of 'bstat@stats'")
+        }
         dmrStat <- bstat@stats[, stat]
     }
-    if(is(bstat, "BSseqStat")) {
+    if (is(bstat, "BSseqStat")) {
         dmrStat <- getStats(bstat, what = "stat")
     }
     if (is(dmrStat, "DelayedArray")) {
@@ -15,10 +16,12 @@ dmrFinder <- function(bstat, cutoff = NULL, qcutoff = c(0.025, 0.975),
         dmrStat <- as.vector(dmrStat)
     }
     subverbose <- max(as.integer(verbose) - 1L, 0L)
-    if(is.null(cutoff))
+    if (is.null(cutoff)) {
         cutoff <- quantile(dmrStat, qcutoff)
-    if(length(cutoff) == 1)
+    }
+    if (length(cutoff) == 1) {
         cutoff <- c(-cutoff, cutoff)
+    }
     direction_logical <- dmrStat >= cutoff[2]
     direction <- as.integer(direction_logical)
     idx <- dmrStat <= cutoff[1]
@@ -28,30 +31,32 @@ dmrFinder <- function(bstat, cutoff = NULL, qcutoff = c(0.025, 0.975),
     positions <- start(bstat)
     regions <- regionFinder3(direction, chr = chrs, positions = positions,
                              maxGap = maxGap, verbose = subverbose)
-    if(is.null(regions$down) && is.null(regions$up))
+    if (is.null(regions$down) && is.null(regions$up)) {
         return(NULL)
-    if(verbose) cat("[dmrFinder] creating dmr data.frame\n")
+    }
+    if (verbose) {
+        cat("[dmrFinder] creating dmr data.frame\n")
+    }
     regions <- do.call(rbind, regions)
     rownames(regions) <- NULL
     regions$width <- regions$end - regions$start + 1
     regions$invdensity <- regions$width / regions$n
     regions$chr <- as.character(regions$chr)
-    if(is(bstat, "BSseqTstat")) {
+    if (is(bstat, "BSseqTstat")) {
         stats <- getStats(bstat, regions, stat = stat)
         regions <- cbind(regions, stats)
-        if(stat %in% c("tstat.corrected", "tstat")) {
+        if (stat %in% c("tstat.corrected", "tstat")) {
             regions$direction <- ifelse(regions$meanDiff > 0, "hyper", "hypo")
         }
         regions <- regions[order(abs(regions$areaStat), decreasing = TRUE),]
     }
-    if(is(bstat, "BSseqStat")) {
+    if (is(bstat, "BSseqStat")) {
         stats <- getStats(bstat, regions)
         regions <- cbind(regions, stats)
         regions <- regions[order(abs(regions$areaStat), decreasing = TRUE), ]
     }
     regions
 }
-
 
 clusterMaker <- function(chr, pos, order.it=TRUE, maxGap=300){
     nonaIndex <- which(!is.na(chr) & !is.na(pos))

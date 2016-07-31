@@ -1,10 +1,10 @@
 # TODO: Simplify to use logic from F-stat permutation scheme also for T-stat.
 #       Aim is to reduce all the hardcoded special cases and hopefully provide
 #       a unified permutation interface.
-
 getNullDistribution_BSmooth.tstat <- function(BSseq, idxMatrix1, idxMatrix2,
                                               estimate.var, local.correct,
-                                              cutoff, stat, maxGap, mc.cores = 1) {
+                                              cutoff, stat, maxGap,
+                                              mc.cores = 1) {
     stopifnot(nrow(idxMatrix1) == nrow(idxMatrix2))
     message(sprintf("[getNullDistribution_BSmooth.tstat] performing %d permutations\n", nrow(idxMatrix1)))
     nullDist <- mclapply(1:nrow(idxMatrix1), function(ii) {
@@ -23,22 +23,33 @@ getNullDistribution_BSmooth.tstat <- function(BSseq, idxMatrix1, idxMatrix2,
     nullDist
 }
 
-getNullDistribution_BSmooth.fstat <- function(BSseq,
-                                              idxMatrix,
-                                              design, contrasts,
-                                              coef = NULL, cutoff,
+# TODO: Should there be a `hdf5` argument?
+getNullDistribution_BSmooth.fstat <- function(BSseq, idxMatrix, design,
+                                              contrasts, coef = NULL, cutoff,
                                               maxGap.sd, maxGap.dmr,
-                                              mc.cores = 1) {
+                                              mc.cores = 1, hdf5 = FALSE,
+                                              realise = TRUE) {
+    stopifnot(is(BSseq, "BSseq"))
+    stopifnot(hasBeenSmoothed(BSseq))
+    tAllPs <- t(getMeth(BSseq, type = "smooth", what = "perBase",
+                        confint = FALSE))
+    if (realise && is(tAllPs, "DelayedArray")) {
+        tAllPs <- as.array(tAllPs)
+    }
 
     message(sprintf("[getNullDistribution_BSmooth.fstat] performing %d permutations\n",
                     nrow(idxMatrix)))
     # NOTE: Using mc.preschedule = TRUE
     nullDist <- mclapply(seq_len(nrow(idxMatrix)), function(ii) {
         ptime1 <- proc.time()
-        # NOTE: More efficient to permute design matrix using idxMatrix[ii, ] than
-        #       permute the raw data with BSseq[, idxMatrix[ii, ]]
-        bstat <- BSmooth.fstat(BSseq, design = design[idxMatrix[ii, ], ],
-                               contrasts = contrasts)
+        # NOTE: More efficient to permute design matrix using idxMatrix[ii, ]
+        #       than to permute the raw data with tAllPs[idxMatrix[ii, ]]
+        bstat <- .BSmooth.fstat.workhorse(tAllPs = tAllPs,
+                                          design = design[idxMatrix[ii, ], ,
+                                                          drop = FALSE],
+                                          contrasts = contrasts,
+                                          parameters = BSseq@parameters,
+                                          hdf5 = FALSE)
         bstat <- smoothSds(bstat, maxGap = maxGap.sd)
         bstat <- computeStat(bstat, coef = coef)
         dmrs0 <- dmrFinder(bstat, cutoff = cutoff, maxGap = maxGap.dmr)
@@ -59,31 +70,28 @@ permuteAll <- function(nperm, design) {
 }
 
 getNullBlocks_BSmooth.tstat <- function(BSseq, idxMatrix1, idxMatrix2, estimate.var = "same",
-                          mc.cores = 1) {
+                                        mc.cores = 1) {
     getNullDistribution_BSmooth.tstat(BSseq = BSseq, idxMatrix1 = idxMatrix1,
-                       idxMatrix2 = idxMatrix2, local.correct = FALSE,
-                       estimate.var = estimate.var,
-                       cutoff = c(-2,2), stat = "tstat", maxGap = 10000,
-                       mc.cores = mc.cores)
+                                      idxMatrix2 = idxMatrix2, local.correct = FALSE,
+                                      estimate.var = estimate.var,
+                                      cutoff = c(-2,2), stat = "tstat", maxGap = 10000,
+                                      mc.cores = mc.cores)
 }
 
 getNullDmrs_BSmooth.tstat <- function(BSseq, idxMatrix1, idxMatrix2, estimate.var = "same",
-                        mc.cores = 1) {
+                                      mc.cores = 1) {
     getNullDistribution_BSmooth.tstat(BSseq = BSseq, idxMatrix1 = idxMatrix1,
-                       idxMatrix2 = idxMatrix2, local.correct = TRUE,
-                       estimate.var = estimate.var,
-                       cutoff = c(-4.6,4.6), stat = "tstat.corrected", maxGap = 300,
-                       mc.cores = mc.cores)
+                                      idxMatrix2 = idxMatrix2, local.correct = TRUE,
+                                      estimate.var = estimate.var,
+                                      cutoff = c(-4.6,4.6), stat = "tstat.corrected", maxGap = 300,
+                                      mc.cores = mc.cores)
 }
-
-
-
 
 subsetDmrs <- function(xx) {
     if(is.null(xx) || is(xx, "try-error"))
         return(NULL)
     out <- xx[ xx[,"n"] >= 3 & abs(xx[, "meanDiff"]) > 0.1 &
-                  xx[, "invdensity"] <= 300, ]
+                   xx[, "invdensity"] <= 300, ]
     if(nrow(out) == 0)
         return(NULL)
     out
@@ -110,7 +118,7 @@ getFWER <- function(null, type = "blocks") {
         if (type == "blocks") {
             out <- sapply(null, function(nulldist) {
                 # any(abs(nulldist$meanDiff) >= meanDiff &
-                        # nulldist$width >= width)
+                # nulldist$width >= width)
                 any(abs(nulldist$areaStat) >= areaStat &
                         nulldist$width >= width)
             })
@@ -261,9 +269,9 @@ makeIdxMatrix <- function(group1, group2, testIsSymmetric = TRUE, includeUnbalan
         }
         if(includeUnbalanced) {
             newMatrix1 <- combineMat(subsetByMatrix(group1, combinations(6,4)),
-                                    subsetByMatrix(group2, combinations(6,2)))
+                                     subsetByMatrix(group2, combinations(6,2)))
             newMatrix2 <- combineMat(subsetByMatrix(group1, combinations(6,5)),
-                                    as.matrix(group2, ncol = 1))
+                                     as.matrix(group2, ncol = 1))
             idxMatrix1 <- rbind(idxMatrix1, newMatrix1, newMatrix2)
         }
         if(includeUnbalanced && !testIsSymmetric) {

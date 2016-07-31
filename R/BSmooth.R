@@ -1,10 +1,10 @@
-makeClusters <- function(hasGRanges, maxGap = 10 ^ 8) {
-    chrOrder <- as.character(runValue(seqnames(hasGRanges)))
+makeClusters <- function(gr, maxGap = 10 ^ 8) {
+    stopifnot(is(gr, "GRanges"))
+    chrOrder <- as.character(runValue(seqnames(gr)))
     if (anyDuplicated(chrOrder)) {
-        stop("argument 'hasGRanges' is not properly order")
+        stop("argument 'gr' is not properly ordered")
     }
-    grBase <- granges(hasGRanges)
-    clusters <- reduce(resize(grBase, width = 2 * maxGap + 1, fix = "center"))
+    clusters <- reduce(resize(gr, width = 2 * maxGap + 1, fix = "center"))
     start(clusters) <- pmax(rep(1, length(clusters)), start(clusters))
     clusters.sp <- split(clusters, seqnames(clusters))
     # Are the clusters ordered within the chromosome? This is probably
@@ -18,8 +18,8 @@ makeClusters <- function(hasGRanges, maxGap = 10 ^ 8) {
     }, logical(1L))))
     clusters <- Reduce(c, clusters.sp[chrOrder])
     stopifnot(all(chrOrder == runValue(seqnames(clusters))))
-    ov <- findOverlaps(grBase, clusters)
-    clusterIdx <- split(as.matrix(ov)[,1], as.matrix(ov)[,2])
+    ov <- findOverlaps(gr, clusters)
+    clusterIdx <- split(queryHits(ov), subjectHits(ov))
     names(clusterIdx) <- NULL
     clusterIdx
 }
@@ -98,7 +98,7 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
         cat("[BSmooth] preprocessing ... ")
     }
     ptime1 <- proc.time()
-    clusterIdx <- makeClusters(BSseq, maxGap = maxGap)
+    clusterIdx <- makeClusters(granges(BSseq), maxGap = maxGap)
     ptime2 <- proc.time()
     stime <- (ptime2 - ptime1)[3]
     if (verbose) {
@@ -111,7 +111,7 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
     switch(parallelBy, "sample" = {
         if (verbose) {
             cat(sprintf("[BSmooth] smoothing by 'sample' (mc.cores = %d, mc.preschedule = %s)\n",
-                                mc.cores, mc.preschedule))
+                        mc.cores, mc.preschedule))
         }
         out <- mclapply(seq_along(sampleNames), function(sIdx) {
             ptime1 <- proc.time()
@@ -148,7 +148,7 @@ BSmooth <- function(BSseq, ns = 70, h = 1000, maxGap = 10^8,
     }, "chromosome" = {
         if (verbose) {
             cat(sprintf("[BSmooth] smoothing by 'chromosome' (mc.cores = %d, mc.preschedule = %s)\n",
-                                mc.cores, mc.preschedule))
+                        mc.cores, mc.preschedule))
         }
         out <- mclapply(seq_along(clusterIdx), function(ii) {
             ptime1 <- proc.time()

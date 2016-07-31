@@ -1,18 +1,28 @@
+# TODO: Need to resolve potential licensing issue: limma is GPL2 and bsseq is
+#       Artistic-2.0, but the code in this file is adapted from R/lmfit.R in
+#       limma. If we can't use this code, then we can just fall back to using
+#       limma::lmFit() with the attendant loss in speed and increase in memory
+#       usage.
+
 #-------------------------------------------------------------------------------
 # Adapted from limma::lmFit for special case(s) used in bsseq
-# NOTE: y should be transposed, i.e., samples as rows and loci as columns
+# NOTE: y should be transposed, i.e., y should have samples as rows and loci as
+#       columns
 # Limitations:
-# - `y` must be a matrix
-# - Many options to limma::lmFit() are not supported
-#   - `ndups` is not supported
-#   - `spacing` is not supported
-#   - `block` is not supported
-#   - `correlation` is not supported
-#   - `weights` is not supported
-#   - `method` is not supported
+#   - `y` must be a matrix
+#   - The return value only contains those elements needed in downstream bsseq
+#     functionality
+#       - `genes` is always set to NULL
+#       - `Amean` is not computed or returned
+#   - Many options to limma::lmFit() are not supported
+#       - `ndups` is not supported
+#       - `spacing` is not supported
+#       - `block` is not supported
+#       - `correlation` is not supported
+#       - `weights` is not supported
+#       - `method` is not supported
 
 # Benchmarking
-
 # > design
 # (Intercept) BSseq$Sexmale
 # 1           1             1
@@ -28,21 +38,23 @@
 # [1] "contr.treatment"
 # > dim(allPs)
 # [1] 23059530        6
-# > tallPs <- t(allPs)
-
-# > microbenchmark(lmFit(allPs, design), .lmFit(tallPs, design), times = 10)
+# > tAllPs <- t(allPs)
+# > microbenchmark(lmFit(allPs, design), .lmFit(tAllPs, design), times = 10)
 # Unit: seconds
 # expr      min       lq     mean   median       uq
-# lmFit(allPs, design) 14.00243 14.90291 20.45310 20.19567 22.85180
-# .lmFit(tallPs, design) 11.53216 12.86627 17.97016 16.47999 17.81626
+# lmFit(allPs, design) 17.35394 19.22649 21.33923 20.52108 24.05139
+# .lmFit(tAllPs, design) 11.16108 16.98138 18.31080 19.25468 20.44507
 # max neval
-# 30.41207    10
-# 36.08204    10
-# profvis(lmFit(allPs, design)) reports 'Memory: 0/7916.9 MB'
-# profvis(.lmFit(allPs, design)) reports 'Memory 0/6509.4 MB'
+# 26.25427    10
+# 23.27585    10
+# > profvis(lmFit(allPs, design))
+# Memory: 0/9412.3 MB'
+# > profvis(.lmFit(tAllPs, design))
+# Memory: 0/7125.2 MB'
 
-# Summary: .lmFit() saves ~4 seconds (~25% of time) and ~1.4 GB (~18% of
-#          memory) over lmFit()
+# Summary: .lmFit() saves 7-15% of time and ~25% of memory usage over
+#          limma::lmFit()
+
 .lmFit <- function(y, design) {
     stopifnot(is.matrix(y))
     if (is.null(design)) {
@@ -53,16 +65,16 @@
             stop("design must be a numeric matrix")
         }
         if (nrow(design) != nrow(y)) {
-            stop("row dimension of design doesn't match column dimension of data object")
+            stop("row dimension of design doesn't match column dimension of ",
+                 "data object")
         }
     }
-    ne <- limma::nonEstimable(design)
+    ne <- nonEstimable(design)
     if (!is.null(ne)) {
         cat("Coefficients not estimable:", paste(ne, collapse = " "), "\n")
     }
 
-    fit <- .lm.series(M = y,
-                      design = design)
+    fit <- .lm.series(M = y, design = design)
 
     if (NCOL(fit$coef) > 1) {
         n <- rowSums(is.na(fit$coef))
@@ -73,7 +85,6 @@
         }
     }
 
-    # NOTE: probes are always set to NULL in .lmFit()
     fit$genes <- NULL
     fit$method <- "ls"
     fit$design <- design
@@ -83,27 +94,38 @@
 #-------------------------------------------------------------------------------
 # Adapted from limma::lm.series for special case(s) used in bsseq
 # NOTE: M should be transposed from it's orientation in limma::lm.series(),
-#       i.e., samples as rows and loci as columns
+#       i.e., M should have samples as rows and loci as columns
 # Limitations:
-# - All limitations inherited from .lmFit()
+#   - All limitations inherited from .lmFit()
+#   - The return value only contains those elements needed in downstream bsseq
+#     functionality
+#       - `df.residual` is returned as a vector with length 1 rather than with
+#         length(df.residual) == ncol(tAllPs). `df.residual` is constant
+#         across all loci, so no information is lost. Furthermore, bsseq does
+#         not currently use `df.residual` in any downstream computations.
+#       - `pivot` is not returned
 
 # Benchmarking
-# > microbenchmark(.lm.series(M = tallPs, design = design), lm.series(M = allPs, design = design), times = 20)
+# > microbenchmark(.lm.series(M = tAllPs, design = design), lm.series(M = allPs, design = design), times = 20)
 # Unit: seconds
-# expr       min       lq     mean
-# .lm.series(M = tallPs, design = design)  9.850865 13.20839 17.84259
-# lm.series(M = allPs, design = design) 11.403523 15.95992 19.87436
+# expr      min       lq     mean
+# .lm.series(M = tAllPs, design = design) 10.91780 14.63206 18.99563
+# lm.series(M = allPs, design = design) 12.40072 14.78253 19.63373
 # median       uq      max neval
-# 16.80557 20.86947 36.10210    20
-# 19.32464 21.44028 34.83261    20
+# 16.63868 19.39843 38.41019    20
+# 18.81319 25.80417 31.37283    20
+# > profvis(lm.series(M = allPs, design = design))
+# Memory: 0 / 8620.2 MB
+# > profvis(.lm.series(M = tAllPs, design = design))
+# Memory 0 / 6509.4 MB
 
-# Summary: We can save ~2-3 seconds by using .lm.series(). It's important to
-#          note there was considerable run-to-run variation, but .lm.series()
-#          always came out ahead of lm.series()
+# Summary: We can save ~12% running time and ~25% of memory usage by using
+#          .lm.series() insetad of limma::lm.series()
+
 .lm.series <- function(M, design = NULL) {
     narrays <- nrow(M)
 
-    # NOTE: Redundanct if call from .lmFit()
+    # NOTE: Redundant if called from .lmFit()
     if (is.null(design)) {
         design <- matrix(1, narrays, 1)
     } else {
@@ -126,13 +148,14 @@
     # If so, fit all genes in one sweep
     NoProbeWts <- all(is.finite(M))
     if (NoProbeWts) {
-        # TODO: If wanting to be really ballsy, could use .lm.fit() but would
-        #       require some post-processing of the .lm.fit() output
+        # NOTE: If wanting to be really crazy, could use .lm.fit(). This would
+        #       require some post-processing of the .lm.fit() output and it is
+        #       not obvious that it is worth the effort involved
         fit <- lm.fit(design, M)
         if (fit$df.residual > 0) {
             if (is.matrix(fit$effects)) {
                 fit$sigma <- sqrt(colMeans(
-                    fit$effects[(fit$rank + 1):narrays, , drop = FALSE] ^ 2))
+                    fit$effects[(fit$rank + 1):narrays, , drop = FALSE]^2))
             } else {
                 fit$sigma <- sqrt(mean(fit$effects[(fit$rank + 1):narrays]^2))
             }
@@ -150,9 +173,6 @@
         stdev.unscaled[, est] <- matrix(sqrt(diag(fit$cov.coefficients)),
                                         ngenes, fit$qr$rank, byrow = TRUE)
         fit$stdev.unscaled <- stdev.unscaled
-        # TODO: Do we need df.residual to be repeated in order to use with
-        #       classifyTestsF()? If not, just record once
-        fit$df.residual <- rep.int(fit$df.residual, ngenes)
         dimnames(fit$stdev.unscaled) <- dimnames(fit$coefficients)
         fit$pivot <- fit$qr$pivot
         return(fit)
