@@ -198,7 +198,8 @@ computeStat <- function(BSseqStat, coef = NULL, hdf5 = FALSE) {
 #       outputs to disk
 fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
                            coef = NULL, maxGap.sd = 10 ^ 8, maxGap.dmr = 300,
-                           mc.cores = 1, hdf5 = FALSE) {
+                           type = "dmrs", mc.cores = 1, hdf5 = FALSE) {
+    type <- match.arg(type, c("dmrs", "blocks"))
     stopifnot(is(BSseq, "BSseq"))
     stopifnot(hasBeenSmoothed(BSseq))
     # TODO: It may be more efficient to create a new .h5 file for tAllPs rather
@@ -234,7 +235,7 @@ fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
                                                   maxGap.sd = maxGap.sd,
                                                   maxGap.dmr = maxGap.dmr,
                                                   mc.cores = mc.cores)
-    fwer <- getFWER.fstat(null = c(list(dmrs), nullDist), type = "dmrs")
+    fwer <- getFWER.fstat(null = c(list(dmrs), nullDist), type = type)
     dmrs$fwer <- fwer
     meth <- getMeth(BSseq, regions = dmrs, what = "perRegion")
     meth <- t(apply(meth, 1, function(xx) tapply(xx, fac, mean)))
