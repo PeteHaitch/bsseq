@@ -35,6 +35,10 @@ read.bismark <- function(files,
     ## Process each file
     idxes <- seq_along(files)
     names(idxes) <- sampleNames
+    # TODO: If `fileType = "cytosineReport"` and `rmZeroCov = TRUE` then
+    #       may not want to remove zero coverage sites until the combined
+    #       BSseq object is formed, otherwise lose the opportunity to do the
+    #       'cbind() shortcut' in combineList()all
     allOut <- mclapply(idxes, function(ii) {
         if (verbose) {
             cat(sprintf("[read.bismark] Reading file '%s' ... ", files[ii]))
