@@ -17,6 +17,24 @@ getStats <- function(bstat, regions = NULL, ...) {
     c(areaStat, maxStat)
 }
 
+# Internal helper used by getStats_BSseqStat()
+.getRegionStats_BSseqStat <- function(ov, stat) {
+    # NOTE: Rather than split(ov) [as in the original implementation of
+    #       getStats_BSseqStat()], we split() the required element of the
+    #       the `stat` matrix-like object. This is slightly more efficient if
+    #       stat is a matrix and **much** more efficient if stat is a
+    #       DelayedArray.
+    # NOTE: split,DelayedArray-method returns a *List and thus realises the
+    #       data in memory. And, of course, split.array() returns a list, which
+    #       is already realised in memory
+    stat <- stat[queryHits(ov), ]
+    regionStats <- matrix(NA, ncol = 2, nrow = subjectLength(ov),
+                          dimnames = list(NULL, c("areaStat", "maxStat")))
+    tmp <- lapply(split(stat, subjectHits(ov)), .getRegionStats)
+    regionStats[as.integer(names(tmp)), ] <- do.call(rbind, tmp)
+    regionStats
+}
+
 getStats_BSseqStat <- function(BSseqStat, regions = NULL, what = NULL) {
     stopifnot(is(BSseqStat, "BSseqStat"))
     if (!is.null(what)) {
@@ -27,22 +45,12 @@ getStats_BSseqStat <- function(BSseqStat, regions = NULL, what = NULL) {
         return(BSseqStat@stats)
     }
     ## Now we have regions and no what
-    if (class(regions) == "data.frame")
+    if (class(regions) == "data.frame") {
         regions <- data.frame2GRanges(regions)
+    }
     ov <- findOverlaps(BSseqStat, regions)
-    # NOTE: Rather than split(ov) [as in the original implementation of
-    #       getStats_BSseqStat()], we split() the required element of the
-    #       @stats slot. This is slightly more efficient if @stat is a matrix
-    #       and **much** more efficient if @stat is a DelayedArray.
-    #       split,DelayedArray-method returns a *List and thus realises the
-    #       data in memory. And, of course, split.array() returns a list, which
-    #       is already realised in memory
-    stat <- BSseqStat@stats$stat[queryHits(ov), ]
-    regionStats <- matrix(NA, ncol = 2, nrow = length(regions),
-                          dimnames = list(NULL, c("areaStat", "maxStat")))
-    tmp <- lapply(split(stat, subjectHits(ov)), .getRegionStats)
-    regionStats[as.integer(names(tmp)),] <- do.call(rbind, tmp)
-    regionStats
+    .getRegionStats_BSseqStat(ov = ov,
+                              stat = slot(BSseqStat, "stats")[["stat"]])
 }
 
 .getRegionStats_ttest <- function(g1m, g2m, tsd) {
@@ -53,9 +61,11 @@ getStats_BSseqStat <- function(BSseqStat, regions = NULL, what = NULL) {
     c(meanDiff, group1.mean, group2.mean, tstat.sd)
 }
 
+# TODO: Re-factor like getStats_BSseqStat)()
 # TODO: Why doesn't this have a 'what' argument? Causes (minor) problems in
 #       plotting.R since it requires slightly different handling to F-stat
-getStats_BSseqTstat <- function(BSseqTstat, regions = NULL, stat = "tstat.corrected") {
+getStats_BSseqTstat <- function(BSseqTstat, regions = NULL,
+                                stat = "tstat.corrected") {
     stopifnot(is(BSseqTstat, "BSseqTstat"))
     stopifnot(stat %in% colnames(BSseqTstat@stats))
     if (is.null(regions)) {

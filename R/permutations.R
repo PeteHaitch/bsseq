@@ -23,50 +23,89 @@ getNullDistribution_BSmooth.tstat <- function(BSseq, idxMatrix1, idxMatrix2,
     nullDist
 }
 
-# TODO: Should there be a `hdf5` argument?
-getNullDistribution_BSmooth.fstat <- function(BSseq, idxMatrix, design,
-                                              contrasts, coef = NULL, cutoff,
-                                              maxGap.sd, maxGap.dmr,
-                                              mc.cores = 1, hdf5 = FALSE,
-                                              realise = TRUE) {
-    stopifnot(is(BSseq, "BSseq"))
-    stopifnot(hasBeenSmoothed(BSseq))
-    tAllPs <- t(getMeth(BSseq, type = "smooth", what = "perBase",
-                        confint = FALSE))
-    if (realise && is(tAllPs, "DelayedArray")) {
-        tAllPs <- as.array(tAllPs)
-    }
 
-    message(sprintf("[getNullDistribution_BSmooth.fstat] performing %d permutations\n",
-                    nrow(idxMatrix)))
+# NOTE: Internal helper used by getNullDistribution_BSmooth.fstat()
+.getNullDistribution_BSmooth.fstat <- function(permutationMatrix, gr, tAllPs,
+                                               design, contrasts, clusterIdx,
+                                               coef, cutoff, maxGap, mc.cores,
+                                               verbose = TRUE, hdf5 = FALSE) {
+
+    message(paste0("[getNullDistribution_BSmooth.fstat] performing ",
+                   nrow(permutationMatrix), " permutations\n"))
+
+    # TODO (undotted): Some check that permtuationMatrix, design, and contrasts are
+    #       compatible
+
     # NOTE: Using mc.preschedule = TRUE
-    nullDist <- mclapply(seq_len(nrow(idxMatrix)), function(ii) {
+    # TODO: Should I explicitly pass all the required objects as arguments to
+    #       function(ii, ...)
+    nullDist <- mclapply(seq_len(nrow(permutationMatrix)), function(ii) {
         ptime1 <- proc.time()
-        # NOTE: More efficient to permute design matrix using idxMatrix[ii, ]
-        #       than to permute the raw data with tAllPs[idxMatrix[ii, ]]
-        bstat <- .BSmooth.fstat.workhorse(tAllPs = tAllPs,
-                                          design = design[idxMatrix[ii, ], ,
-                                                          drop = FALSE],
-                                          contrasts = contrasts,
-                                          parameters = BSseq@parameters,
-                                          hdf5 = FALSE)
-        bstat <- smoothSds(bstat, maxGap = maxGap.sd)
-        bstat <- computeStat(bstat, coef = coef)
-        dmrs0 <- dmrFinder(bstat, cutoff = cutoff, maxGap = maxGap.dmr)
+        # NOTE: More efficient to permute design matrix using
+        #       permutationMatrix[ii, ] than to permute the raw data with
+        #       tAllPs[permutationMatrix[ii, ]]
+        permuted_design <- design[permutationMatrix[ii, ], , drop = FALSE]
+        val <- .fstat.dmr.pipeline(gr = gr,
+                                   tAllPs = tAllPs,
+                                   design = permuted_design,
+                                   contrasts = contrasts,
+                                   clusterIdx = clusterIdx,
+                                   coef = coef,
+                                   cutoff = cutoff,
+                                   maxGap = maxGap,
+                                   return_bstat = FALSE,
+                                   verbose = verbose,
+                                   hdf5 = hdf5)
+        dmrs <- val[["dmrs"]]
         ptime2 <- proc.time()
         stime <- (ptime2 - ptime1)[3]
-        message(sprintf("[getNullDistribution_BSmooth.fstat] completing permutation %d in %.1f sec\n", ii, stime))
-        dmrs0
-    }, mc.cores = min(nrow(idxMatrix), mc.cores), mc.preschedule = TRUE)
+        if (verbose) {
+            message(sprintf("[getNullDistribution_BSmooth.fstat] completing permutation %d in %.1f sec\n", ii, stime))
+        }
+        dmrs
+    })
+    nullDist
+}
+
+getNullDistribution_BSmooth.fstat <- function(permutationMatrix, BSseq,
+                                              design, contrasts, coef, cutoff,
+                                              maxGap.sd, maxGap.dmr,
+                                              mc.cores, verbose = TRUE,
+                                              hdf5 = FALSE) {
+    # NOTE: Certain objects can be reused without changed when identifying DMRs
+    #       in the permuted data. Constructing these once saves unnecessary
+    #       computation
+    gr <- rowRanges(BSseq)
+    # TODO: Should tAllPs be realised at this point; i.e. can the forked
+    #       processed share the same tAllPs object?
+    tAllPs <- t(getMeth(BSseq, type = "smooth", what = "perBase",
+                        confint = FALSE))
+    clusterIdx <- makeClusters(gr = gr, maxGap = maxGap.sd)
+    if (is.null(coef)) {
+        coef <- seq_len(ncol(design) - 1L)
+    }
+    nullDist <- .getNullDistribution_BSmooth.fstat(
+        permutationMatrix = permutationMatrix,
+        gr = gr,
+        tAllPs = tAllPs,
+        design = design,
+        contrasts = contrasts,
+        clusterIdx = clusterIdx,
+        coef = coef,
+        cutoff = cutoff,
+        maxGap = maxGap.dmr,
+        mc.cores = mc.cores)
     nullDist
 }
 
 permuteAll <- function(nperm, design) {
-    message(sprintf("[permuteAll] performing %d unrestricted permutations of the design matrix\n", nperm))
+    message(paste("[permuteAll] performing ", nperm, " unrestricted ",
+                  "permutations of the design matrix\n"))
 
     CTRL <- how(nperm = nperm)
     # NOTE: shuffleSet() returns a nperm * nrow(design) matrix of permutations
-    idxMatrix <- shuffleSet(n = nrow(design), control = CTRL)
+    permutationMatrix <- shuffleSet(n = nrow(design), control = CTRL)
+    permutationMatrix
 }
 
 getNullBlocks_BSmooth.tstat <- function(BSseq, idxMatrix1, idxMatrix2, estimate.var = "same",
@@ -142,31 +181,36 @@ getFWER.fstat <- function(null, type = "blocks") {
     reference <- null[[1]]
     null <- null[-1]
     null <- null[!sapply(null, is.null)]
-    # TODO: Will break if null == list(), which can occur in practice (although
-    #       rarely).
-    better <- sapply(1:nrow(reference), function(ii) {
-        # meanDiff <- abs(reference$meanDiff[ii])
-        areaStat <- abs(reference$areaStat[ii])
-        width <- reference$width[ii]
-        n <- reference$n[ii]
-        if (type == "blocks") {
-            out <- sapply(null, function(nulldist) {
-                # any(abs(nulldist$meanDiff) >= meanDiff &
-                # nulldist$width >= width)
-                any(abs(nulldist$areaStat) >= areaStat &
-                        nulldist$width >= width)
-            })
-        }
-        if (type == "dmrs") {
-            out <- sapply(null, function(nulldist) {
-                # any(abs(nulldist$meanDiff) >= meanDiff &
-                #     nulldist$n >= n)
-                any(abs(nulldist$areaStat) >= areaStat &
-                        nulldist$n >= n)
-            })
-        }
-        sum(out)
-    })
+    if (length(null)) {
+        # At least on element of `null` has a 'DMR'
+        better <- sapply(seq_len(nrow(reference)), function(ii) {
+            # meanDiff <- abs(reference$meanDiff[ii])
+            areaStat <- abs(reference$areaStat[ii])
+            width <- reference[["width"]][ii]
+            n <- reference$n[ii]
+            if (type == "blocks") {
+                out <- sapply(null, function(nulldist) {
+                    # any(abs(nulldist$meanDiff) >= meanDiff &
+                    # nulldist$width >= width)
+                    any(abs(nulldist[["areaStat"]]) >= areaStat &
+                            nulldist[["width"]] >= width)
+                })
+            }
+            if (type == "dmrs") {
+                out <- sapply(null, function(nulldist) {
+                    # any(abs(nulldist$meanDiff) >= meanDiff &
+                    #     nulldist$n >= n)
+                    any(abs(nulldist[["areaStat"]]) >= areaStat &
+                            nulldist[["n"]] >= n)
+                })
+            }
+            sum(out)
+        })
+    } else {
+        # None of the elements of `null` has a 'DMR', so all elements of
+        # `reference` are by definition better
+        better <- rep(0L, nrow(reference))
+    }
     better
 }
 
