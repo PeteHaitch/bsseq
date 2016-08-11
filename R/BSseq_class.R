@@ -329,7 +329,7 @@ setMethod("updateObject", "BSseq",
           }
 )
 
-strandCollapse <- function(BSseq, shift = TRUE) {
+strandCollapse <- function(BSseq, shift = TRUE, hdf5 = FALSE) {
     if (all(runValue(strand(BSseq)) == "*")) {
         warning("All loci are unstranded; nothing to collapse")
         return(BSseq)
@@ -352,7 +352,8 @@ strandCollapse <- function(BSseq, shift = TRUE) {
         a
     })
     BS.comb <- combine(BS.forward, BS.reverse)
-    newBSseq <- collapseBSseq(BS.comb, columns = rep(sampleNames(BSseq), 2))
+    newBSseq <- collapseBSseq(BS.comb, columns = rep(sampleNames(BSseq), 2),
+                              hdf5 = hdf5)
     newBSseq
 }
 

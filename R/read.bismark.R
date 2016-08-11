@@ -57,7 +57,7 @@ read.bismark <- function(files,
                                                  hdf5 = hdf5)
         }
         if (strandCollapse) {
-            out <- strandCollapse(out)
+            out <- strandCollapse(out, hdf5 = hdf5)
         }
         ptime2 <- proc.time()
         stime <- (ptime2 - ptime1)[3]

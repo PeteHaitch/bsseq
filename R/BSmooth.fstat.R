@@ -264,7 +264,7 @@ computeStat <- function(BSseqStat, coef = NULL, hdf5 = FALSE) {
         ov <- findOverlaps(gr, data.frame2GRanges(dmrs))
         dmrs_stats <- .getRegionStats_BSseqStat(ov = ov, stat = stat)
         dmrs <- cbind(dmrs, dmrs_stats)
-        dmrs[order(abs(dmrs[["areaStat"]]), decreasing = TRUE), ]
+        dmrs <- dmrs[order(abs(dmrs[["areaStat"]]), decreasing = TRUE), ]
     }
     if (return_bstat) {
         parameters <- c(parameters,
