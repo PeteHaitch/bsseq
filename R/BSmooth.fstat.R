@@ -302,6 +302,7 @@ fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
     #       processed share the same tAllPs object?
     tAllPs <- t(getMeth(BSseq, type = "smooth", what = "perBase",
                         confint = FALSE))
+    parameters <- getBSseq(BSseq, "parameters")
     clusterIdx <- makeClusters(gr = gr, maxGap = maxGap.sd)
     if (is.null(coef)) {
         coef <- seq_len(ncol(design) - 1L)
@@ -310,6 +311,7 @@ fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
     # Compute bstat and identify candidate DMRs
     bstat_and_dmrs <- .fstat.dmr.pipeline(gr = gr,
                                           tAllPs = tAllPs,
+                                          parameters = parameters,
                                           design = design,
                                           contrasts = contrasts,
                                           clusterIdx = clusterIdx,
