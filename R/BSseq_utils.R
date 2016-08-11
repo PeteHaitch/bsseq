@@ -19,9 +19,15 @@ collapseBSseq <- function(BSseq, columns, hdf5 = FALSE) {
     M <- do.call(cbind, lapply(sp, function(ss) {
         rowSums(getBSseq(BSseq, "M")[, ss, drop = FALSE])
     }))
+    # NOTE: rowSums() always returns numeric, but we know M to be an integer
+    #       matrix
+    storage.mode(M) <- "integer"
     Cov <- do.call(cbind, lapply(sp, function(ss) {
         rowSums(getBSseq(BSseq, "Cov")[, ss, drop = FALSE])
     }))
+    # NOTE: rowSums() always returns numeric, but we know Cov to be an integer
+    #       matrix
+    storage.mode(Cov) <- "integer"
     if (hdf5) {
         M <- .safeHDF5Array(M, "BSseq.", "M")
         Cov <- .safeHDF5Array(Cov, "BSseq.", "Cov")
