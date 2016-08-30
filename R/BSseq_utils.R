@@ -70,7 +70,7 @@ p.conf <- function(p, n, alpha) {
 #       regions is non-NULL; discuss with Kasper
 getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
                     what = c("perBase", "perRegion"), confint = FALSE,
-                    alpha = 0.95) {
+                    alpha = 0.95, mc.cores = 1) {
 
     stopifnot(is(BSseq, "BSseq"))
     type <- match.arg(type)
@@ -112,19 +112,28 @@ getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
         stop("'confint = TRUE' is not supported by 'getMeth' when regions is given")
     }
     grBSseq <- granges(BSseq)
-    # NOTE: Rather than split(ov) [as in the original implementation of
-    #       getMeth()], we split(meth). This is slightly more efficient if
-    #       meth is a matrix and **much** more efficient if meth is a
-    #       DelayedArray. split,DelayedArray-method returns a *List and
-    #       thus realises the data in memory. And, of course,
-    #       split.array() returns a list, which is already realised in
-    #       memory. Therefore, regardless of input, the result is a list-like
-    #       object of matrix objects.
+    # Option 1: Rather than split(ov) [as in the original implementation of
+    #           getMeth()], we split(meth). This is slightly more efficient if
+    #           meth is a matrix and **much** more efficient if meth is a
+    #           DelayedArray. split,DelayedArray-method returns a *List and
+    #           thus realises the data in memory. And, of course,
+    #           split.array() returns a list, which is already realised in
+    #           memory. Therefore, regardless of input, the result is a
+    #           list-like object of matrix objects.
+    # NOTE: This realises a large object in memory (`meth`) - could do it in
+    #       chunks if what = perRegion
+    #
     ov <- findOverlaps(grBSseq, regions)
     if (type == "smooth") {
         meth <- getBSseq(BSseq, "trans")(getBSseq(BSseq, "coef"))[queryHits(ov), , drop = FALSE]
+        if (is(meth, "DelayedMatrix")) {
+            meth <- as.array(meth)
+        }
     } else if (type == "raw") {
         meth <- (getBSseq(BSseq, "M") / getBSseq(BSseq, "Cov"))[queryHits(ov), , drop = FALSE]
+        if (is(meth, "DelayedMatrix")) {
+            meth <- as.array(meth)
+        }
     }
     out <- lapply(split(meth, subjectHits(ov)), matrix, ncol = ncol(meth))
     if (what == "perBase") {
@@ -134,7 +143,8 @@ getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
         outList[as.integer(names(out))] <- out
         return(outList)
     } else if (what == "perRegion") {
-        out <- do.call(rbind, lapply(out, colMeans, na.rm = TRUE))
+        # TODO: Use a tapply() rather than a split()+lapply()
+        out <- do.call(rbind, mclapply(out, colMeans, na.rm = TRUE, mc.cores = mc.ores))
         # TODO: Don't really understand the logic of the remaining code; how
         #       could the rows end up in the wrong order?
         outMatrix <- matrix(NA, ncol = ncol(BSseq), nrow = length(regions))
@@ -142,6 +152,27 @@ getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
         outMatrix[as.integer(rownames(out)), ] <- out
         return(outMatrix)
     }
+    # Option 2: Experimenting with split(queryHits(ov), subjectHits(ov)) and
+    #             looping/mclapply()-ing because split(meth, subjectHits(ov))
+    #             realises in memory and if meth is large then this blows up
+    # ov <- findOverlaps(grBSseq, regions)
+    # split_ov <- split(queryHits(ov), subjectHits(ov))
+    # if (type == "smooth") {
+    #     meth <- getBSseq(BSseq, "trans")(getBSseq(BSseq, "coef"))
+    # } else if (type == "raw") {
+    #     meth <- getBSseq(BSseq, "M") / getBSseq(BSseq, "Cov")
+    # }
+    # if (what == "perBase") {
+    #     # TODO
+    # } else if (what == "perRegion") {
+    #     # UP TO HERE: Running. Actually, okay to load up entire meth object.
+    #     #             After all, we have to load the entire object to run a
+    #     #             regression, so if it can be done there it can be done here
+    #     #
+    #     out <- do.call(rbind, mclapply(split_ov, function(i) {
+    #         colMeans(meth[i, ])
+    #     }, mc.cores = mc.cores))
+    # }
 }
 
 # TODO: getCoverage() realises the result in memory iff regions is not NULL;

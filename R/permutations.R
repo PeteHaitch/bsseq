@@ -45,18 +45,18 @@ getNullDistribution_BSmooth.tstat <- function(BSseq, idxMatrix1, idxMatrix2,
         #       permutationMatrix[ii, ] than to permute the raw data with
         #       tAllPs[permutationMatrix[ii, ]]
         permuted_design <- design[permutationMatrix[ii, ], , drop = FALSE]
-        val <- .fstat.dmr.pipeline(gr = gr,
-                                   tAllPs = tAllPs,
-                                   design = permuted_design,
-                                   contrasts = contrasts,
-                                   clusterIdx = clusterIdx,
-                                   coef = coef,
-                                   cutoff = cutoff,
-                                   maxGap = maxGap,
-                                   return_bstat = FALSE,
-                                   verbose = verbose,
-                                   hdf5 = hdf5)
-        dmrs <- val[["dmrs"]]
+        bstat_and_dmrs <- .fstat.dmr.pipeline(gr = gr,
+                                              tAllPs = tAllPs,
+                                              design = permuted_design,
+                                              contrasts = contrasts,
+                                              clusterIdx = clusterIdx,
+                                              coef = coef,
+                                              cutoff = cutoff,
+                                              maxGap = maxGap,
+                                              return_bstat = FALSE,
+                                              verbose = verbose,
+                                              hdf5 = hdf5)
+        dmrs <- bstat_and_dmrs[["dmrs"]]
         ptime2 <- proc.time()
         stime <- (ptime2 - ptime1)[3]
         if (verbose) {

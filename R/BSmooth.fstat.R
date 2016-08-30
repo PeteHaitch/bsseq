@@ -9,6 +9,9 @@
 .BSmooth.fstat <- function(tAllPs, parameters, design, contrasts,
                            verbose = TRUE, hdf5 = FALSE) {
     ptime1 <- proc.time()
+    # TODO: Experiment with calling .bsseq.lm.fit() on chunks of tAllPs,
+    #       realised serially. Should give identical results with reduced
+    #       memory footprint
     # NOTE: Currently have to realise all of tAllPs in memory. tAllPs can be
     #       large because it has nrow = number of loci and ncol = number of
     #       samples. It could be useful, and might be necessary, to do this
@@ -350,7 +353,8 @@ fstat.pipeline <- function(BSseq, design, contrasts, cutoff, fac, nperm = 1000,
 
     # Compute average methylation level in each group (`fac`) for each
     # candidate DMR
-    meth <- getMeth(BSseq, regions = dmrs, what = "perRegion")
+    meth <- getMeth(BSseq, regions = dmrs, what = "perRegion",
+                    mc.cores = mc.cores)
     meth <- t(apply(meth, 1, function(xx) tapply(xx, fac, mean)))
     dmrs <- cbind(dmrs, meth)
 
