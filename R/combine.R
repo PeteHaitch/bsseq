@@ -76,6 +76,8 @@ combineList <- function(x, ..., hdf5 = FALSE) {
         stop("all elements of '...' in combineList needs to have the same trans")
     }
     sameGr <- vapply(x[-1], function(xx) {
+        # Switch to all.equal.GenomicRanges()?
+        # https://gist.github.com/PeteHaitch/13787125a165928e652dcfea2a8d166a
         identical(gr, getBSseq(xx, "gr"))
     }, logical(1L))
     sampleNames <- do.call(c, unname(lapply(x, sampleNames)))
