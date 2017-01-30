@@ -144,7 +144,7 @@ getMeth <- function(BSseq, regions = NULL, type = c("smooth", "raw"),
         return(outList)
     } else if (what == "perRegion") {
         # TODO: Use a tapply() rather than a split()+lapply()
-        out <- do.call(rbind, mclapply(out, colMeans, na.rm = TRUE, mc.cores = mc.ores))
+        out <- do.call(rbind, mclapply(out, colMeans, na.rm = TRUE, mc.cores = mc.cores))
         # TODO: Don't really understand the logic of the remaining code; how
         #       could the rows end up in the wrong order?
         outMatrix <- matrix(NA, ncol = ncol(BSseq), nrow = length(regions))
