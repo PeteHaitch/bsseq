@@ -118,6 +118,7 @@ specify and/or determine that function/method should return HDF5-backed result.
 Currently, using `hdf5` argument to relevant functions. Perhaps there should be 
 a package option? Perhaps function/method should default to `hdf5 = TRUE` if 
 input includes HDF5-backed data?
+
 > A good question. For which I'm not sure I have a good answer. I've
 plans to modify summarizeOverlaps() to let the user choose if they
 want the returned SummarizedExperiment object to be in memory (the
