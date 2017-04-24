@@ -8,15 +8,16 @@ importFrom(BiocGenerics, "anyDuplicated", "cbind", "colnames",
            "nrow", "order", "paste", "pmax", "pmin", "rbind",
            "Reduce", "rep.int", "rownames", "sapply", "setdiff",
            "strand", "strand<-", "union", "unique", "updateObject")
+importMethodsFrom(BiocGenerics, "plotPCA")
 importFrom(stats, "approxfun", "fisher.test", "ppoints",
            "predict", "preplot", "qchisq",
            "qnorm", "qqplot", "qunif", "cov2cor",
-           "plogis")
+           "plogis", "prcomp")
 importFrom(graphics, "abline", "axis", "layout", "legend", "lines",
            "mtext", "par", "plot", "points", "polygon", "rect", "rug", "text")
 import(parallel)
 importFrom(locfit, "locfit", "lp")
-importFrom(matrixStats, "rowSds", "rowVars", "rowMaxs", "rowMins")
+importFrom(matrixStats, "rowSds", "rowVars", "rowMaxs", "rowMins", "colVars")
 import(IRanges)
 import(GenomicRanges)
 import(SummarizedExperiment)
@@ -61,7 +62,8 @@ exportMethods("[", "show",
               "sampleNames", "sampleNames<-",
               "pData", "pData<-",
               "findOverlaps", "subsetByOverlaps",
-              "combine", "updateObject")
+              "combine", "updateObject",
+              "plotPCA")
 
 export("BSseq", "getMeth", "getCoverage", "getBSseq", "getStats",
        "collapseBSseq", "orderBSseq", "hasBeenSmoothed", "chrSelectBSseq",
@@ -83,3 +85,6 @@ S3method("plot", "BSseqTstat")
 
 exportMethods("assays", "assayNames")
 
+## C/C++ registration
+
+useDynLib("bsseq", .registration = TRUE)

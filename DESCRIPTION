@@ -58,6 +58,7 @@ Collate:
     hdf5_utils.R
     combine_utils.R
     DelayedArray_utils.R
+    PCA.R
 License: Artistic-2.0
 VignetteBuilder: knitr
 URL: https://github.com/kasperdanielhansen/bsseq
