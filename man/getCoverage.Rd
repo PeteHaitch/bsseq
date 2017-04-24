@@ -8,7 +8,7 @@
 }
 \usage{
 getCoverage(BSseq, regions = NULL, type = c("Cov", "M"),
-  what = c("perBase", "perRegionAverage", "perRegionTotal"))
+  what = c("perBase", "perRegionAverage", "perRegionTotal"), mc.cores = 1)
 }
 \arguments{
   \item{BSseq}{An object of class \code{BSseq}.}
@@ -17,6 +17,14 @@ getCoverage(BSseq, regions = NULL, type = c("Cov", "M"),
   \item{type}{This returns either coverage or the total
     evidence for methylation at the loci.}
   \item{what}{The type of return object, see details.}
+  \item{mc.cores}{The number of cores used. Has no effect unless \code{regions}
+    is non-\code{NULL}. The effect of \code{mc.cores} has not been extensively
+    profiled. However, if \code{BSseq} is HDF5Array-backed, then setting
+    \code{mc.cores} > 1 should be faster. If \code{BSseq} is not
+    HDF5Array-backed, then setting \code{mc.cores} > 1 may be slower since it
+    incurs the cost of copying the BSseq object to the workers. Note that
+    setting \code{mc.cores} to a value greater than 1 is not supported on
+    MS Windows, see the help page for \code{\link[parallel]{mclapply}}.}
 }
 \value{
   \strong{NOTE:} The return type of \code{getCoverage} varies depending on its

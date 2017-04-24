@@ -8,7 +8,7 @@
 }
 \usage{
 getMeth(BSseq, regions = NULL, type = c("smooth", "raw"),
-  what = c("perBase", "perRegion"), confint = FALSE, alpha = 0.95)
+  what = c("perBase", "perRegion"), confint = FALSE, alpha = 0.95, mc.cores = 1)
 }
 \arguments{
   \item{BSseq}{An object of class \code{BSseq}.}
@@ -20,6 +20,14 @@ getMeth(BSseq, regions = NULL, type = c("smooth", "raw"),
     methylation estimates (see below).  This is only supported if
     \code{what} is equal to \code{perBase}.}
   \item{alpha}{alpha value for the confidence interval.}
+  \item{mc.cores}{The number of cores used. Has no effect unless \code{regions}
+    is non-\code{NULL}. The effect of \code{mc.cores} has not been extensively
+    profiled. However, if \code{BSseq} is HDF5Array-backed, then setting
+    \code{mc.cores} > 1 should be faster. If \code{BSseq} is not
+    HDF5Array-backed, then setting \code{mc.cores} > 1 may be slower since it
+    incurs the cost of copying the BSseq object to the workers. Note that
+    setting \code{mc.cores} to a value greater than 1 is not supported on
+    MS Windows, see the help page for \code{\link[parallel]{mclapply}}.}
 }
 \note{
   A \code{BSseq} object needs to be smoothed by the function
